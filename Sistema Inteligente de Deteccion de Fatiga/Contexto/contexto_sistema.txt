@@ -1,0 +1,129 @@
+===============================================================================
+ESPECIFICACIÓN TÉCNICA Y CONTEXTO DEL SISTEMA "TRANS COPACABANA"
+MÓDULO 1 (ADMINISTRACIÓN) Y MÓDULO 2 (MONITOREO)
+===============================================================================
+
+1. VISIÓN GENERAL DEL PROYECTO Y TECNOLOGÍAS
+-------------------------------------------------------------------------------
+El sistema "Trans Copacabana" es una plataforma distribuida para el rastreo de flota interdepartamental y prevención de accidentes por fatiga o exceso de velocidad.
+
+Stack Tecnológico de la Fase 1:
+- Backend: Python 3.11+ con FastAPI (Asíncrono).
+- Seguridad: OAuth2 con JWT (JSON Web Tokens) y cifrado de contraseñas con Passlib/Bcrypt.
+- ORM / Acceso a Datos: SQLAlchemy 2.0 / SQLModel con GeoAlchemy2 para soporte geoespacial.
+- Base de Datos: PostgreSQL 15+ con extensión PostGIS (Manejo de SRID 4326 / WGS84).
+- Comunicación en Tiempo Real: WebSockets nativos de FastAPI.
+- Frontend (Dashboard Operador): HTML5, JavaScript (ES6+), Tailwind CSS / Bootstrap 5, Leaflet.js para mapas con OpenStreetMap.
+
+
+2. MÓDULO 1: ADMINISTRACIÓN Y GESTIÓN (ESPECIFICACIÓN DETALLADA)
+-------------------------------------------------------------------------------
+2.1. Gestión de Usuarios, Roles y Autenticación:
+- Entidad Base: `usuario` (id, ci, nombre, apellido, email, password_hash, rol, estado).
+- Subtipo Conductor: `conductor` (id [FK->usuario.id], licencia_conducir, categoria_licencia, telefono_emergencia, hash_biometria, puntaje_promedio).
+- Roles del Sistema:
+  * 'ADMIN': Acceso total a configuraciones y CRUDs.
+  * 'OPERADOR': Acceso al Pre-despacho y al Dashboard de Monitoreo.
+  * 'CONDUCTOR': Acceso al perfil móvil e inicio de ruta.
+- Regla de Negocio: La autenticación devuelve un Bearer Token con el `id`, `email` y `rol` del usuario.
+
+2.2. Gestión de Flota y Rutas:
+- Vehículos: Administra la flota de buses (`placa`, `numero_disco`, `modelo`, `capacidad_pasajeros`, `estado`).
+- Rutas Geoespaciales: Define el origen, destino, distancia en kilómetros, duración estimada en horas y la geometría del trayecto (`trayecto_geom` tipo LineString PostGIS).
+
+2.3. Hojas de Ruta y Regla de Tripulación Doble:
+- La `hoja_de_ruta` une un vehículo con una ruta programada en una fecha y hora específicas.
+- Regla Crítica de Negocio (ATT): Al crear o programar una Hoja de Ruta, el backend debe evaluar el campo `duracion_estimada_hrs` de la ruta seleccionada. Si la duración es mayor a 4.0 horas, la API debe exigir obligatoriamente la asignación de DOS conductores en la tabla `asignacion_tripulacion` (Un conductor tipo 'PRINCIPAL' y otro 'RELEVO'). Si es menor o igual a 4.0 horas, basta con un conductor 'PRINCIPAL'.
+
+2.4. Flujo de Validación de Pre-Despacho (Terminal):
+- Antes de que un bus inicie su trayecto, el Operador de Terminal ejecuta la validación.
+- Estados de la Hoja de Ruta: 'BORRADOR' -> 'PRE_DESPACHO' -> 'AUTORIZADA' -> 'EN_TRANSITO' -> 'FINALIZADA'.
+- Endpoint Pre-Despacho: Registra `resultado_alcotest` (debe ser 0.00 mg/L) si se cumplen, la Hoja de Ruta cambia automáticamente a estado 'AUTORIZADA'.
+
+
+3. MÓDULO 2: MONITOREO Y CENTRO DE CONTROL (ESPECIFICACIÓN DETALLADA)
+-------------------------------------------------------------------------------
+3.1. Servidor de Ingesta de Telemetría (WebSockets):
+- Endpoint: `/ws/telemetry/{hoja_de_ruta_id}`.
+- La aplicación móvil del conductor envía un payload JSON cada 1 a 5 segundos con la siguiente estructura:
+  {
+    "hoja_de_ruta_id": "UUID",
+    "conductor_id": "UUID",
+    "latitud": -17.3895,
+    "longitud": -66.1568,
+    "velocidad_kmh": 75.5,
+    "timestamp_captura": "2026-10-05T03:14:00Z"
+  }
+- El backend procesa esta trama, guarda la coordenada en PostGIS (`registro_telemetria`), actualiza la posición del vehículo en memoria y realiza un broadcast vía WebSocket a todos los operadores conectados al Dashboard.
+
+3.2. Dashboard Web Interactiva (Leaflet.js):
+- La interfaz del operador consume el WebSocket general de monitoreo (`/ws/dashboard`).
+- Despliega un mapa centrado en las rutas de la flota con marcadores dinámicos para cada bus activo ('EN_TRANSITO').
+- Semaforización de Riesgo por Bus:
+  * VERDE: Operación normal, velocidad <= 80 km/h, sin alertas de fatiga.
+  * AMARILLO: Advertencia por exceso de velocidad (> 80 km/h) o fatiga preventiva.
+  * ROJO: Fatiga Crítica detectada por el sistema de visión artificial en cabina.
+
+3.3. Ingesta de Eventos Críticos de Incidente:
+- Endpoint/WS: Recibe eventos de la tabla `incidente_alerta` enviados por el cliente edge.
+- Si llega un evento de `FATIGA_CRITICA` o `EXCESO_VELOCIDAD`, el servidor genera una alerta de alta prioridad en el Dashboard del operador con sonido de notificación y emergente en el mapa.
+
+3.4. Atencion de Incidentes y Protocolo de Parada Segura (PPS):
+- Cuando el operador da clic en un bus con alerta 'ROJA', se abre un modal para registrar la atención (`atencion_incidente`).
+- Campos a registrar: `accion_tomada` ('LLAMADA_VERIFICACION', 'ORDEN_DESCANSO', 'SOLICITUD_RELEVO', 'FALSA_ALARMA'), `observaciones` y `parada_segura_id`.
+- Al guardar la atención, el estado del incidente pasa a atendido y el bus vuelve a estado de supervisión regular.
+
+3.5. Historial y Consultas Geoespaciales:
+- Endpoint GET `/api/v1/telemetria/historial/{hoja_de_ruta_id}`: Retorna el trayecto recorrido en formato GeoJSON (`ST_AsGeoJSON`) para repetición o trazado de ruta en el mapa.
+
+
+4. CONSIDERACIONES TÉCNICAS Y REGLAS DE BD
+-------------------------------------------------------------------------------
+- Todas las claves primarias son de tipo UUID para permitir sincronización distribuida offline-first.
+- Las coordenadas se manejan bajo el sistema espacial WGS84 (EPSG:4326).
+- Los timestamps deben manejarse con zona horaria (`TIMESTAMP WITH TIME ZONE` / UTC en servidor).
+- Si el agente de software identifica inconsistencias en las tablas o requiere índices adicionales para PostGIS, puede proponer e implementar las modificaciones DDL necesarias.
+- Credenciales para ingresar a postgres (contraseña: 'Pulg42,' , puerto:5432)
+===============================================================================
+
+===============================================================================
+5. MÓDULO 3: DETECCIÓN DE FATIGA Y ALERTA EN CABINA (VISIÓN INTEGRAL FUTURA)
+===============================================================================
+
+5.1. Arquitectura de Ejecución en el Borde (Mobile Edge Computing / PWA):
+- Dispositivo Principal: Smartphone del conductor actuando como nodo local de procesamiento.
+- Aplicación Móvil: Progressive Web App (PWA) con arquitectura Offline-First.
+- Service Workers: Cachean assets, estilos y lógica JS para garantizar disponibilidad al 100% sin cobertura de red.
+- Base de Datos Local: IndexedDB / SQLite-WASM en el navegador para almacenar colas de eventos en áreas sin señal.
+
+5.2. Integración de Hardware y Sensores en Cabina:
+- Cámara Infrarroja (IR) USB OTG: Conectada al puerto Type-C del smartphone. La PWA captura el flujo de video mediante la API `MediaDevices` del navegador y procesa imágenes en la oscuridad (longitudes de onda de 850 nm / 940 nm).
+- Adaptador/HUB OTG con Power Delivery (PD): Mantiene la carga continua de la batería del teléfono desde el puerto de 12V del bus mientras transfiere datos de la cámara.
+- Alertas Físicas vía Web Bluetooth API: La PWA utiliza `navigator.bluetooth` para comunicarse directamente con un microcontrolador ESP32 en cabina, activando un buzzer (zumbador) y LEDs de advertencia física sin requerir infraestructura de red.
+
+5.3. Procesamiento de Visión Artificial e Inteligencia Artificial Local:
+- Motor de Visión: MediaPipe Face Landmarker compilado en WebAssembly (WASM) y acelerado por WebGL directamente en la GPU del teléfono.
+- Malla Facial: Extracción en tiempo real de 468 puntos de referencia faciales a un rendimiento mínimo de 15 FPS.
+- Métricas Calculadas:
+  * PERCLOS (Percentage of Eye Closure): Porcentaje de tiempo en que los párpados cubren más del 80% de la pupila en ventanas deslizantes de 60 segundos.
+  * Frecuencia de Bostezos: Detección de apertura prolongada de la distancia entre labios.
+  * Índice de Fatiga (IF): Algoritmo numérico normalizado de 0.00 a 1.00.
+
+5.4. Lógica de Alertas Locales y Filtro por Velocidad GPS:
+- Lectura de Velocidad: La PWA consulta la API `navigator.geolocation` para obtener la velocidad instantánea directa del chip GPS del hardware.
+- Filtro de Falsos Positivos: Si la velocidad del bus es menor a 40 km/h o se encuentra detenido (0 km/h), las alarmas sonoras de alta intensidad en cabina se suprimen automáticamente.
+- Disparo de Alerta Crítica (IF >= 0.75 y Velocidad >= 40 km/h):
+  1. Sirena a máximo volumen por el altavoz del teléfono (o sistema de audio Bluetooth del bus).
+  2. Interfaz visual parpadeante en tono Rojo Crítico y flash estroboscópico.
+  3. Envío de paquete local por Web Bluetooth al ESP32 para activar buzzer y LEDs físicos.
+  4. Escritura inmediata del evento en IndexedDB local.
+
+5.5. Estrategia de Sincronización Asíncrona con el Backend (FastAPI):
+- Estado Online (Red 4G/LTE disponible):
+  * La PWA transmite la alerta crítica de forma inmediata mediante la conexión WebSocket activa hacia el servidor central.
+- Estado Offline (Zonas de Sombra en Carretera):
+  * Las tramas de telemetría y los registros de `incidente_alerta` se acumulan localmente con sus UUIDs pre-generados en el teléfono.
+- Mecanismo de Reintento (Background Sync):
+  * La PWA escucha los eventos de conectividad (`online`). Al detectar señal 4G/LTE, ejecuta una petición `POST /api/v1/sync` enviando la ráfaga de eventos pendientes.
+  * El backend en FastAPI recibe el lote de registros, los inserta de forma masiva (*bulk insert*) en PostgreSQL/PostGIS sin colisiones de ID (gracias al uso de UUID) y notifica al Dashboard Web de Monitoreo.
+===============================================================================

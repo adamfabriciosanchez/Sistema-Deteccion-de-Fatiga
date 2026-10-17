@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Reportes - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+        <h2 class="h3 fw-bold mb-0 text-dark">Reportes Dinámicos del Sistema</h2>
+        <p class="text-muted small mb-0">Análisis de viajes, incidentes de fatiga y desempeño de conductores</p>
+    </div>
+    <div>
+        <button class="btn btn-sm btn-tc-outline" onclick="window.print()">
+            <i class="fa-solid fa-print me-1"></i> Imprimir
+        </button>
+    </div>
+</div>
+
+<!-- Tabs de Reportes -->
+<ul class="nav nav-tabs mb-4" id="reportesTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-semibold" id="tab-viajes" data-bs-toggle="tab" data-bs-target="#pane-viajes" type="button" role="tab">
+            <i class="fa-solid fa-route me-1 text-danger"></i> Resumen de Viajes
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" id="tab-incidentes" data-bs-toggle="tab" data-bs-target="#pane-incidentes" type="button" role="tab">
+            <i class="fa-solid fa-triangle-exclamation me-1 text-warning"></i> Incidentes y Alertas
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" id="tab-fatiga" data-bs-toggle="tab" data-bs-target="#pane-fatiga" type="button" role="tab">
+            <i class="fa-solid fa-brain me-1 text-primary"></i> Índice de Fatiga por Conductor
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="reportesTabContent">
+    <!-- ============================================ -->
+    <!-- TAB 1: RESUMEN DE VIAJES                     -->
+    <!-- ============================================ -->
+    <div class="tab-pane fade show active" id="pane-viajes" role="tabpanel">
+        <div class="card card-formal">
+            <div class="card-formal-header">
+                <i class="fa-solid fa-clipboard-list text-danger me-1"></i>
+                Registro de Viajes Programados (Últimos 50)
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-formal align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Bus</th>
+                            <th>Ruta</th>
+                            <th>Fecha Salida</th>
+                            <th>Estado</th>
+                            <th class="text-center">Registros GPS</th>
+                            <th class="text-center">Incidentes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rv in resumen_viajes %}
+                        <tr>
+                            <td class="fw-bold text-danger">{{ rv.hoja.codigo_hoja }}</td>
+                            <td>
+                                <div class="fw-semibold">{{ rv.hoja.vehiculo.numero_interno if rv.hoja.vehiculo else '--' }}</div>
+                                <div class="text-muted small">{{ rv.hoja.vehiculo.placa if rv.hoja.vehiculo else '' }}</div>
+                            </td>
+                            <td>
+                                <div>{{ rv.hoja.origen_ciudad }} <i class="fa-solid fa-arrow-right text-muted mx-1"></i> {{ rv.hoja.destino_ciudad }}</div>
+                                <div class="text-muted small">{{ rv.hoja.distancia_km or '--' }} km | {{ rv.hoja.duracion_estimada_hrs or '--' }} hrs</div>
+                            </td>
+                            <td class="small">{{ rv.hoja.fecha_salida.strftime('%Y-%m-%d %H:%M') if rv.hoja.fecha_salida else '--' }}</td>
+                            <td>
+                                {% if rv.hoja.estado.value == 'EN_TRANSITO' %}
+                                <span class="badge bg-primary"><i class="fa-solid fa-bus me-1"></i>EN TRANSITO</span>
+                                {% elif rv.hoja.estado.value == 'FINALIZADA' %}
+                                <span class="badge bg-secondary">FINALIZADA</span>
+                                {% elif rv.hoja.estado.value == 'AUTORIZADA' %}
+                                <span class="badge bg-success">AUTORIZADA</span>
+                                {% elif rv.hoja.estado.value == 'PRE_DESPACHO' %}
+                                <span class="badge bg-warning text-dark">PRE DESPACHO</span>
+                                {% else %}
+                                <span class="badge bg-light text-dark border">{{ rv.hoja.estado.value|sin_guion }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-info">{{ rv.total_telemetrias }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% if rv.total_incidentes > 0 %}
+                                <span class="badge bg-danger">{{ rv.total_incidentes }}</span>
+                                {% else %}
+                                <span class="badge bg-light text-muted border">0</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">No hay viajes registrados aún. Ejecute una simulación desde el Centro de Monitoreo.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- TAB 2: INCIDENTES Y ALERTAS                  -->
+    <!-- ============================================ -->
+    <div class="tab-pane fade" id="pane-incidentes" role="tabpanel">
+        <div class="card card-formal">
+            <div class="card-formal-header">
+                <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i>
+                Registro de Incidentes Viales (Últimos 100)
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-formal align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Fecha/Hora</th>
+                            <th>Tipo de Incidente</th>
+                            <th>Bus</th>
+                            <th>Conductor</th>
+                            <th>Velocidad</th>
+                            <th>IF / PERCLOS</th>
+                            <th>Nivel</th>
+                            <th>Atención PPS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inc in resumen_incidentes %}
+                        <tr>
+                            <td class="small">{{ inc.timestamp_evento.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>
+                                {% if inc.tipo_incidente.value == 'FATIGA_CRITICA' %}
+                                <span class="badge bg-danger">FATIGA CRÍTICA</span>
+                                {% elif inc.tipo_incidente.value == 'SOMNOLENCIA_PREVENTIVA' %}
+                                <span class="badge bg-warning text-dark">SOMNOLENCIA</span>
+                                {% elif inc.tipo_incidente.value == 'EXCESO_VELOCIDAD' %}
+                                <span class="badge bg-warning text-dark">EXCESO VELOCIDAD</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="fw-semibold">{{ inc.hoja_de_ruta.vehiculo.numero_interno if inc.hoja_de_ruta and inc.hoja_de_ruta.vehiculo else '--' }}</span>
+                            </td>
+                            <td class="small">
+                                {% if inc.conductor and inc.conductor.usuario %}
+                                {{ inc.conductor.usuario.nombre }} {{ inc.conductor.usuario.apellido }}
+                                {% else %}
+                                --
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="fw-bold {% if inc.velocidad_instantanea|float > 80 %}text-danger{% endif %}">
+                                    {{ "%.1f"|format(inc.velocidad_instantanea|float) }} km/h
+                                </span>
+                            </td>
+                            <td class="small">
+                                {% if inc.indice_fatiga_if %}
+                                <span class="{% if inc.indice_fatiga_if|float >= 0.75 %}text-danger fw-bold{% elif inc.indice_fatiga_if|float >= 0.50 %}text-warning fw-bold{% else %}text-success{% endif %}">
+                                    IF: {{ "%.3f"|format(inc.indice_fatiga_if|float) }}
+                                </span>
+                                {% if inc.perclos_porcentaje %}
+                                <br><span class="text-muted">PERCLOS: {{ "%.1f"|format(inc.perclos_porcentaje|float) }}%</span>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if inc.nivel_riesgo.value == 'ROJO' %}
+                                <span class="badge bg-danger">ROJO</span>
+                                {% elif inc.nivel_riesgo.value == 'AMARILLO' %}
+                                <span class="badge bg-warning text-dark">AMARILLO</span>
+                                {% else %}
+                                <span class="badge bg-success">VERDE</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if inc.atencion %}
+                                <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>{{ inc.atencion.accion_tomada.value|sin_guion }}</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Pendiente</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">No hay incidentes registrados. Ejecute una simulación con escenario de fatiga.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- TAB 3: ÍNDICE DE FATIGA POR CONDUCTOR        -->
+    <!-- ============================================ -->
+    <div class="tab-pane fade" id="pane-fatiga" role="tabpanel">
+        <div class="card card-formal">
+            <div class="card-formal-header">
+                <i class="fa-solid fa-brain text-primary me-1"></i>
+                Análisis de Fatiga por Conductor
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-formal align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Conductor</th>
+                            <th class="text-center">Total Incidentes</th>
+                            <th class="text-center">Fatiga Crítica</th>
+                            <th class="text-center">Somnolencia</th>
+                            <th class="text-center">Exceso Velocidad</th>
+                            <th>IF Promedio</th>
+                            <th>IF Máximo</th>
+                            <th>PERCLOS Promedio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rf in resumen_fatiga %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% if rf.conductor.usuario.foto_url %}
+                                    <img src="{{ rf.conductor.usuario.foto_url }}" alt="Foto" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                                    {% else %}
+                                    <div class="bg-light rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                        <i class="fa-solid fa-user text-muted small"></i>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <div class="fw-semibold">{{ rf.conductor.usuario.nombre }} {{ rf.conductor.usuario.apellido }}</div>
+                                        <div class="text-muted small">Lic: {{ rf.conductor.licencia_conducir }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-dark">{{ rf.total_incidentes }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% if rf.fatiga_critica > 0 %}
+                                <span class="badge bg-danger">{{ rf.fatiga_critica }}</span>
+                                {% else %}
+                                <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if rf.somnolencia > 0 %}
+                                <span class="badge bg-warning text-dark">{{ rf.somnolencia }}</span>
+                                {% else %}
+                                <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if rf.exceso_vel > 0 %}
+                                <span class="badge bg-warning text-dark">{{ rf.exceso_vel }}</span>
+                                {% else %}
+                                <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% set if_color = 'bg-danger' if rf.promedio_if >= 0.75 else ('bg-warning' if rf.promedio_if >= 0.50 else 'bg-success') %}
+                                    <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                        <div class="progress-bar {{ if_color }}" style="width: {{ (rf.promedio_if * 100)|round }}%"></div>
+                                    </div>
+                                    <span class="small fw-bold">{{ rf.promedio_if }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="fw-bold {% if rf.max_if >= 0.75 %}text-danger{% elif rf.max_if >= 0.50 %}text-warning{% else %}text-success{% endif %}">
+                                    {{ rf.max_if }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="small">{{ rf.promedio_perclos }}%</span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">No hay datos de fatiga. Ejecute una simulación con escenario de fatiga para generar datos.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

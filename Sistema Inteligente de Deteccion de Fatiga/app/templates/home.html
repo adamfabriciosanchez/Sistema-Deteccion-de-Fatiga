@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="row align-items-center py-4">
+    <div class="col-lg-8 text-center text-lg-start">
+        <div class="mb-4">
+            <img src="/static/img/logo_trans_copacabana.png" alt="Trans Copacabana S.A." class="img-fluid"
+                style="max-height: 220px;">
+        </div>
+
+        <p class="lead text-secondary">
+            Plataforma centralizada para la administración de personal, control de flota, despacho técnico y monitoreo
+            geoespacial sobre la red vial de Trans Copacabana S.A.
+        </p>
+    </div>
+
+    <div class="col-lg-4 mt-4 mt-lg-0">
+        <div class="card card-formal">
+            <div class="card-formal-header">
+                <i class="fa-solid fa-user-circle text-danger me-2"></i>
+                <span>Estado de Sesión</span>
+            </div>
+            <div class="card-body">
+                {% if current_user %}
+                <p class="mb-2">Ha iniciado sesión como:</p>
+                <div class="p-3 bg-light rounded border mb-3">
+                    <div class="fw-bold">{{ current_user.nombre }} {{ current_user.apellido }}</div>
+                    <div class="text-muted small">{{ current_user.email }}</div>
+                    <div class="mt-2">
+                        <span class="badge bg-danger">{{ current_user.rol.value|sin_guion }}</span>
+                    </div>
+                </div>
+                <a href="/dashboard" class="btn btn-tc-primary w-100">
+                    <i class="fa-solid fa-gauge me-1"></i> Ir al Panel de Control
+                </a>
+                {% else %}
+                <p class="text-muted small mb-3">
+                    Para acceder a las funciones operativas, ingrese con sus credenciales institucionales asignadas.
+                </p>
+                <a href="/login" class="btn btn-tc-primary w-100">
+                    <i class="fa-solid fa-lock me-1"></i> Iniciar Sesión
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

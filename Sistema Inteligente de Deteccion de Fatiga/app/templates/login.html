@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Iniciar Sesión - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <div class="login-card">
+            <div class="text-center mb-4">
+                <div class="mb-2">
+                    <i class="fa-solid fa-shield-halved fa-2x text-danger"></i>
+                </div>
+                <h4 class="login-title">Control de Acceso</h4>
+                <p class="login-subtitle">Sistema Integrado Trans Copacabana</p>
+            </div>
+
+            <form action="/login" method="POST">
+                <div class="mb-3">
+                    <label for="email" class="form-label fw-semibold">Correo Electrónico Corporativo</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fa-solid fa-envelope text-muted"></i></span>
+                        <input type="email" class="form-control" id="email" name="email" value="admin@transcopacabana.com" placeholder="usuario@transcopacabana.com" required autofocus>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label fw-semibold">Contraseña</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fa-solid fa-lock text-muted"></i></span>
+                        <input type="password" class="form-control" id="password" name="password" value="123456" placeholder="••••••••" required>
+                    </div>
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-tc-primary">
+                        <i class="fa-solid fa-right-to-bracket me-1"></i> Ingresar al Sistema
+                    </button>
+                </div>
+            </form>
+
+            <div class="mt-4 pt-3 border-top text-center text-muted small">
+                <p class="mb-1 fw-semibold">Cuentas de Acceso Demostrativas:</p>
+                <div class="text-start bg-light p-2 rounded small">
+                    <div><strong>Admin:</strong> admin@transcopacabana.com / 123456</div>
+                    <div><strong>Operador:</strong> operador@transcopacabana.com / 123456</div>
+                    <div><strong>Conductor:</strong> carlos@conductor.com / 123456</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+
+{% block title %}Panel del Conductor - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+    <!-- Encabezado del Perfil del Conductor -->
+    <div class="col-12">
+        <div class="card card-formal p-3 bg-white border-start border-4 border-danger shadow-sm">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    {% if current_user.foto_url %}
+                    <img src="{{ current_user.foto_url }}" alt="{{ current_user.nombre }}"
+                        class="rounded-circle shadow-sm"
+                        style="width: 56px; height: 56px; object-fit: cover; border: 3px solid #C8102E;">
+                    {% else %}
+                    <div class="avatar-circle bg-danger text-white fs-4 fw-bold d-flex align-items-center justify-content-center shadow-sm"
+                        style="width: 52px; height: 52px; border-radius: 50%;">
+                        {{ current_user.nombre[:1] }}{{ current_user.apellido[:1] }}
+                    </div>
+                    {% endif %}
+                    <div>
+                        <h4 class="h5 fw-bold mb-0 text-dark">{{ current_user.nombre }} {{ current_user.apellido }}</h4>
+                        <div class="text-muted small">
+                            Licencia: <span class="fw-semibold text-dark">{{ current_user.conductor.licencia_conducir if
+                                current_user.conductor else 'N/A' }}</span> |
+                            Cat. <span class="fw-semibold text-dark">{{ current_user.conductor.categoria_licencia if
+                                current_user.conductor else 'C' }}</span> |
+                            Puntaje: <span class="text-warning fw-bold"><i class="fa-solid fa-star"></i> {{
+                                current_user.conductor.puntaje_promedio if current_user.conductor else '5.0' }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <span class="badge bg-light text-dark border p-2 fs-6">
+                        <i class="fa-solid fa-location-dot text-danger me-1"></i> Base Actual: <strong
+                            class="text-danger">{{ base_actual }}</strong>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pestañas de Navegación del Conductor -->
+<ul class="nav nav-pills mb-3 border-bottom pb-2" id="conductorTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold px-4" id="viaje-activo-tab" data-bs-toggle="pill"
+            data-bs-target="#viaje-activo" type="button" role="tab">
+            <i class="fa-solid fa-bus me-1"></i> Viaje Activo
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold px-4 text-dark" id="historial-tab" data-bs-toggle="pill"
+            data-bs-target="#historial" type="button" role="tab">
+            <i class="fa-solid fa-clock-rotate-left me-1"></i> Historial de Viajes ({{ historial_viajes|length }})
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="conductorTabsContent">
+    <!-- ========================================================
+         PESTAÑA 1: VIAJE ACTIVO
+         ======================================================== -->
+    <div class="tab-pane fade show active" id="viaje-activo" role="tabpanel">
+        {% if viaje_activo %}
+        <div class="row g-3">
+            <!-- Detalles del Viaje y Acciones -->
+            <div class="col-lg-7">
+                <div class="card card-formal h-100 shadow-sm border">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                        <span class="fw-bold text-danger">Hoja de Ruta {{ viaje_activo.codigo_hoja }}</span>
+                        <span
+                            class="badge {% if viaje_activo.estado.value == 'EN_TRANSITO' %}bg-success{% elif viaje_activo.estado.value == 'AUTORIZADA' %}bg-primary{% else %}bg-warning text-dark{% endif %} px-3 py-1">
+                            {{ viaje_activo.estado.value|sin_guion }}
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <!-- Origen y Destino -->
+                        <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded mb-3">
+                            <div>
+                                <div class="text-muted small">Origen</div>
+                                <div class="fw-bold fs-5 text-dark">{{ viaje_activo.origen_ciudad }}</div>
+                                <div class="small text-muted">{{ viaje_activo.origen_terminal }}</div>
+                            </div>
+                            <div class="text-center px-3">
+                                <i class="fa-solid fa-arrow-right-long fa-2x text-danger"></i>
+                                <div class="badge bg-white text-dark border mt-1">{{ viaje_activo.duracion_estimada_hrs
+                                    }} hrs</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="text-muted small">Destino</div>
+                                <div class="fw-bold fs-5 text-dark">{{ viaje_activo.destino_ciudad }}</div>
+                                <div class="small text-muted">{{ viaje_activo.destino_terminal }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Información Técnica de la Unidad y Puesto -->
+                        <div class="row g-2 mb-3 small">
+                            <div class="col-sm-6">
+                                <div class="p-2 border rounded">
+                                    <div class="text-muted">Unidad Asignada:</div>
+                                    <div class="fw-bold text-dark">
+                                        Bus Interno {{ viaje_activo.vehiculo.numero_interno }} ({{
+                                        viaje_activo.vehiculo.placa }})
+                                    </div>
+                                    <div class="text-muted">{{ viaje_activo.vehiculo.marca }} {{
+                                        viaje_activo.vehiculo.modelo }} - {{ viaje_activo.vehiculo.tipo_bus.value|sin_guion }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="p-2 border rounded">
+                                    <div class="text-muted">Mi Rol Asignado en Cabina:</div>
+                                    <div>
+                                        {% if rol_en_viaje == 'PRINCIPAL' %}
+                                        <span class="badge bg-danger fs-6 mt-1">CONDUCTOR PRINCIPAL</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary fs-6 mt-1">CONDUCTOR DE RELEVO</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 text-muted small mb-3">
+                            <div class="col-sm-6">
+                                <div><i class="fa-solid fa-calendar me-1 text-danger"></i> Salida Programada: <strong>{{
+                                        viaje_activo.fecha_salida.strftime('%d/%m/%Y %H:%M') }}</strong></div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div><i class="fa-solid fa-road me-1 text-danger"></i> Distancia Oficial: <strong>{{
+                                        viaje_activo.distancia_km }} km</strong></div>
+                            </div>
+                        </div>
+
+                        <!-- Botones de Control de Tiempo Real (Iniciar / Finalizar) -->
+                        <div class="p-3 border rounded bg-white mt-3">
+                            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                                <div>
+                                    <span class="small fw-semibold text-muted">Control de Tránsito en Ruta:</span>
+                                    {% if viaje_activo.fecha_inicio_real %}
+                                    <div class="text-muted small">Inicio real: {{
+                                        viaje_activo.fecha_inicio_real.strftime('%H:%M:%S (%d/%m)') }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex gap-2">
+                                    {% if es_principal %}
+                                    {% if viaje_activo.estado.value == 'AUTORIZADA' %}
+                                    <form action="/mi-hoja/{{ viaje_activo.id|string }}/iniciar" method="POST">
+                                        <button type="submit" class="btn btn-success fw-bold px-4 shadow-sm">
+                                            <i class="fa-solid fa-play me-1"></i> Iniciar Viaje
+                                        </button>
+                                    </form>
+                                    {% elif viaje_activo.estado.value == 'EN_TRANSITO' %}
+                                    <form action="/mi-hoja/{{ viaje_activo.id|string }}/finalizar" method="POST">
+                                        <button type="submit" class="btn btn-danger fw-bold px-4 shadow-sm"
+                                            onclick="return confirm('¿Confirmas que la unidad ha arribado a destino para finalizar el viaje?');">
+                                            <i class="fa-solid fa-flag-checkered me-1"></i> Finalizar Viaje
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel Lateral: Mapa Personal y Alertas PPS -->
+            <div class="col-lg-5">
+                <!-- Mapa Personal de la Unidad en Ruta -->
+                <div class="card card-formal mb-3 shadow-sm border">
+                    <div class="card-formal-header d-flex justify-content-between align-items-center py-2">
+                        <span><i class="fa-solid fa-map-location-dot text-danger me-1"></i> Mi Posición en Ruta</span>
+                        <span id="badgeEstadoConductor"
+                            class="badge {% if viaje_activo.estado.value == 'EN_TRANSITO' %}bg-success{% else %}bg-secondary{% endif %}">
+                            {{ viaje_activo.estado.value|sin_guion }}
+                        </span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="mapaConductor" style="height: 250px; width: 100%;"></div>
+                    </div>
+                </div>
+
+                <!-- Bandeja de Instrucciones y Alertas del Centro de Monitoreo (PPS) -->
+                <div class="card card-formal shadow-sm border">
+                    <div class="card-formal-header d-flex justify-content-between align-items-center py-2 bg-light">
+                        <span class="fw-bold text-dark"><i class="fa-solid fa-bullhorn text-danger me-1"></i>
+                            Instrucciones del Centro de Monitoreo (PPS)</span>
+                        <span class="badge bg-danger">{{ alertas_pps|length }}</span>
+                    </div>
+                    <div class="card-body p-3" style="max-height: 280px; overflow-y: auto;">
+                        {% if alertas_pps %}
+                        {% for inc in alertas_pps %}
+                        <div class="p-2 border rounded mb-2 bg-white shadow-sm">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <span
+                                    class="badge {% if inc.nivel_riesgo.value == 'ROJO' %}bg-danger{% elif inc.nivel_riesgo.value == 'AMARILLO' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    {{ inc.tipo_incidente.value|sin_guion }} ({{ inc.nivel_riesgo.value|sin_guion }})
+                                </span>
+                                <span class="text-muted small">{{ inc.timestamp_evento.strftime('%H:%M:%S') }}</span>
+                            </div>
+                            <div class="small text-muted mb-1">
+                                Velocidad registrada: <strong>{{ inc.velocidad_instantanea }} km/h</strong>
+                                {% if inc.indice_fatiga_if %}
+                                | IF: <strong
+                                    class="{% if inc.indice_fatiga_if|float >= 0.75 %}text-danger{% elif inc.indice_fatiga_if|float >= 0.50 %}text-warning{% else %}text-success{% endif %}">{{
+                                    "%.3f"|format(inc.indice_fatiga_if|float) }}</strong>
+                                {% endif %}
+                                {% if inc.perclos_porcentaje %}
+                                | PERCLOS: <strong>{{ "%.1f"|format(inc.perclos_porcentaje|float) }}%</strong>
+                                {% endif %}
+                            </div>
+                            {% if inc.atencion %}
+                            <div class="alert alert-light border p-2 mb-0 mt-2 small">
+                                <div class="fw-bold text-danger mb-1">
+                                    <i class="fa-solid fa-user-shield me-1"></i> Orden Operativa: {{
+                                    inc.atencion.accion_tomada.value }}
+                                </div>
+                                {% if inc.atencion.mensaje_enviado %}
+                                <div class="text-dark mb-1">"{{ inc.atencion.mensaje_enviado }}"</div>
+                                {% endif %}
+                                {% if inc.atencion.audio_url %}
+                                <div class="mt-2">
+                                    <audio controls class="w-100" style="height: 32px;">
+                                        <source src="{{ inc.atencion.audio_url }}" type="audio/mpeg">
+                                        Tu navegador no soporta reproducción de audio.
+                                    </audio>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <div class="text-muted small fst-italic">Pendiente de atención por el operador.</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="text-center py-4 text-muted small">
+                            <i class="fa-solid fa-shield-heart fa-2x mb-2 text-success opacity-75"></i>
+                            <div>Sin alertas ni órdenes de parada registradas en este viaje. Conducción óptima.</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card card-formal p-5 text-center text-muted shadow-sm">
+            <i class="fa-solid fa-calendar-check fa-3x mb-3 text-secondary opacity-50"></i>
+            <h5 class="fw-bold text-dark">No tienes viajes activos en este momento</h5>
+            <p class="small text-muted mb-0">Cuando el Jefe de Operaciones programe una nueva hoja de ruta para tu
+                perfil, podrás gestionarla aquí.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ========================================================
+         PESTAÑA 2: HISTORIAL DE VIAJES ANTERIORES
+         ======================================================== -->
+    <div class="tab-pane fade" id="historial" role="tabpanel">
+        <div class="card card-formal shadow-sm">
+            <div class="card-formal-header py-2">
+                <span class="fw-bold"><i class="fa-solid fa-clock-rotate-left text-danger me-1"></i> Registro Histórico
+                    de Viajes Concluidos</span>
+            </div>
+            <div class="card-body p-0">
+                {% if historial_viajes %}
+                <div class="accordion accordion-flush" id="accordionHistorial">
+                    {% for h in historial_viajes %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading{{ h.id }}">
+                            <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapse{{ h.id }}">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center w-100 me-3">
+                                    <div>
+                                        <strong class="text-danger me-2">{{ h.codigo_hoja }}</strong>
+                                        <span class="fw-semibold text-dark">{{ h.origen_ciudad }} &rarr; {{
+                                            h.destino_ciudad }}</span>
+                                        <span class="badge bg-secondary ms-2">{{ h.estado.value|sin_guion }}</span>
+                                    </div>
+                                    <div class="text-muted small">
+                                        {{ h.fecha_salida.strftime('%d/%m/%Y') }} | Bus Interno {{
+                                        h.vehiculo.numero_interno }}
+                                    </div>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse{{ h.id }}" class="accordion-collapse collapse"
+                            data-bs-parent="#accordionHistorial">
+                            <div class="accordion-body bg-light">
+                                <div class="row g-2 small mb-3">
+                                    <div class="col-md-3">
+                                        <span class="text-muted">Terminal Salida:</span>
+                                        <div class="fw-semibold">{{ h.origen_terminal }}</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="text-muted">Terminal Llegada:</span>
+                                        <div class="fw-semibold">{{ h.destino_terminal }}</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="text-muted">Duración Estimada:</span>
+                                        <div class="fw-semibold">{{ h.duracion_estimada_hrs }} hrs ({{ h.distancia_km }}
+                                            km)</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="text-muted">Tiempo Real en Ruta:</span>
+                                        <div class="fw-semibold text-danger">{{ h.duracion_real_hrs if
+                                            h.duracion_real_hrs else 'N/A' }} hrs</div>
+                                    </div>
+                                </div>
+
+                                <h6 class="fw-bold small text-dark mb-2">Alertas e Incidentes de este viaje:</h6>
+                                {% if h.incidentes %}
+                                <div class="list-group list-group-flush border rounded bg-white">
+                                    {% for inc in h.incidentes %}
+                                    <div class="list-group-item p-2 small">
+                                        <div class="d-flex justify-content-between">
+                                            <strong>{{ inc.tipo_incidente.value|sin_guion }} ({{ inc.nivel_riesgo.value|sin_guion }})</strong>
+                                            <span class="text-muted">{{ inc.timestamp_evento.strftime('%d/%m/%Y %H:%M')
+                                                }}</span>
+                                        </div>
+                                        <div class="text-muted">Velocidad: {{ inc.velocidad_instantanea }} km/h</div>
+                                        {% if inc.atencion %}
+                                        <div class="text-success mt-1">
+                                            <i class="fa-solid fa-check me-1"></i> Atención: {{
+                                            inc.atencion.accion_tomada.value|sin_guion }} - "{{ inc.atencion.mensaje_enviado or
+                                            'Sin mensaje' }}"
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <div class="text-muted small fst-italic">No se registraron incidentes en este trayecto.
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted small">
+                    No tienes viajes históricos finalizados en tu registro.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts de Mapa Leaflet para el Conductor -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        {% if viaje_activo %}
+        const mapEl = document.getElementById('mapaConductor');
+        if (!mapEl) return;
+
+        // Coordenadas aproximadas según ciudad de origen
+        const COORDENADAS_CIUDADES = {
+            "La Paz": [-16.4957, -68.1396],
+            "Cochabamba": [-17.3895, -66.1568],
+            "Santa Cruz": [-17.7833, -63.1821],
+            "Oruro": [-17.9647, -67.1064],
+            "Sucre": [-19.0333, -65.2627],
+            "Potosí": [-19.5836, -65.7531],
+            "Tarija": [-21.5355, -64.7296]
+        };
+
+        const origenCoord = COORDENADAS_CIUDADES["{{ viaje_activo.origen_ciudad }}"] || [-17.3895, -66.1568];
+        const mapConductor = L.map('mapaConductor').setView(origenCoord, 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: 'OpenStreetMap'
+        }).addTo(mapConductor);
+
+        const estadoViaje = "{{ viaje_activo.estado.value }}";
+        let colorPin = "#6c757d"; // Gris si no ha iniciado
+        if (estadoViaje === "EN_TRANSITO") {
+            colorPin = "#198754"; // Verde si ya inició
+        }
+
+        const busIcon = L.divIcon({
+            className: 'bus-pin-conductor',
+            html: `<div style="background-color: ${colorPin}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 8px rgba(0,0,0,0.4);"></div>`,
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
+        });
+
+        const marker = L.marker(origenCoord, { icon: busIcon }).addTo(mapConductor);
+        marker.bindPopup(`<strong>Bus Interno {{ viaje_activo.vehiculo.numero_interno }}</strong><br>Estado: ${estadoViaje.replace(/_/g, ' ')}`).openPopup();
+
+        // Conectar al WebSocket del bus si está en tránsito
+        if (estadoViaje === "EN_TRANSITO") {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/telemetry/{{ viaje_activo.id }}`;
+            try {
+                const ws = new WebSocket(wsUrl);
+                ws.onmessage = function (event) {
+                    const data = JSON.parse(event.data);
+                    if (data && data.latitud && data.longitud) {
+                        const newPos = [data.latitud, data.longitud];
+                        marker.setLatLng(newPos);
+                        mapConductor.panTo(newPos);
+                    }
+                };
+            } catch (e) {
+                console.warn("WebSocket no conectado para vista conductor:", e);
+            }
+        }
+        {% endif %}
+    });
+</script>
+{% endblock %}

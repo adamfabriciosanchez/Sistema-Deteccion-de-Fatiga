@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block title %}Personal y Conductores - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+        <h2 class="h3 fw-bold mb-0 text-dark">Personal y Conductores de Flota</h2>
+        <p class="text-muted small mb-0">Gestión de usuarios del sistema y conductores habilitados</p>
+    </div>
+    {% if current_user.rol.value == 'ADMIN' %}
+    <button type="button" class="btn btn-tc-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoUsuario">
+        <i class="fa-solid fa-user-plus me-1"></i> Registrar Usuario
+    </button>
+    {% endif %}
+</div>
+
+<div class="card card-formal">
+    <div class="table-responsive">
+        <table class="table table-hover table-formal align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Nombre Completo</th>
+                    <th>C.I.</th>
+                    <th>Correo Electrónico</th>
+                    <th>Rol en Sistema</th>
+                    <th>Licencia / Chofer</th>
+                    <th>Ubicación Actual</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in usuarios %}
+                <tr>
+                    <td class="fw-semibold">
+                        {% if u.foto_url %}
+                        <img src="{{ u.foto_url }}" alt="Foto" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                        {% else %}
+                        <i class="fa-solid fa-user me-2 text-muted"></i>
+                        {% endif %}
+                        {{ u.nombre }} {{ u.apellido }}
+                    </td>
+                    <td>{{ u.ci }}</td>
+                    <td>{{ u.email }}</td>
+                    <td>
+                        {% if u.rol.value == 'ADMIN' %}
+                        <span class="badge bg-danger">ADMINISTRADOR</span>
+                        {% elif u.rol.value == 'OPERADOR' %}
+                        <span class="badge bg-primary">OPERADOR</span>
+                        {% else %}
+                        <span class="badge bg-dark">CONDUCTOR</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.conductor %}
+                        <span class="text-dark fw-bold">{{ u.conductor.licencia_conducir }}</span>
+                        <span class="badge bg-light text-dark border ms-1">Cat. {{ u.conductor.categoria_licencia }}</span>
+                        {% else %}
+                        <span class="text-muted small">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.conductor %}
+                        <span class="badge bg-light text-dark border">
+                            <i class="fa-solid fa-location-dot text-danger me-1"></i>{{ u.conductor.ubicacion_actual or 'Cochabamba' }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted small">Central</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.estado %}
+                        <span class="badge bg-success">ACTIVO</span>
+                        {% else %}
+                        <span class="badge bg-secondary">INACTIVO</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if current_user.rol.value == 'ADMIN' %}
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditarUsuario{{ u.id|string }}">
+                            <i class="fa-solid fa-pen"></i> Editar
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Nuevo Usuario -->
+{% if current_user.rol.value == 'ADMIN' %}
+<div class="modal fade" id="modalNuevoUsuario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger">Registrar Nuevo Usuario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/usuarios/nuevo" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Nombre(s)</label>
+                            <input type="text" name="nombre" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Apellido(s)</label>
+                            <input type="text" name="apellido" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">C.I.</label>
+                            <input type="text" name="ci" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Correo Electrónico</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Contraseña Temporal</label>
+                            <input type="password" name="password" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Rol Asignado</label>
+                            <select name="rol" id="selectRol" class="form-select" required onchange="toggleConductorFields()">
+                                <option value="ADMIN">Administrador</option>
+                                <option value="OPERADOR">Operador</option>
+                                <option value="CONDUCTOR">Conductor</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="conductorFields" class="row g-3 mt-1 d-none">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Licencia de Conducir</label>
+                            <input type="text" name="licencia_conducir" id="inputLicencia" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Categoría de Licencia</label>
+                            <select name="categoria_licencia" id="inputCategoria" class="form-select">
+                                <option value="C">Categoría C</option>
+                                <option value="B">Categoría B</option>
+                                <option value="A">Categoría A</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Ubicación Inicial (Ciudad)</label>
+                            <select name="ubicacion_actual" id="inputUbicacion" class="form-select">
+                                <option value="Cochabamba" selected>Cochabamba</option>
+                                <option value="La Paz">La Paz</option>
+                                <option value="Santa Cruz">Santa Cruz</option>
+                                <option value="Oruro">Oruro</option>
+                                <option value="Sucre">Sucre</option>
+                                <option value="Potosí">Potosí</option>
+                                <option value="Tarija">Tarija</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-12">
+                            <label class="form-label small fw-semibold">Fotografía del Usuario</label>
+                            <input type="file" name="foto" class="form-control" accept=".jpg,.jpeg,.png,.gif,.webp">
+                            <small class="text-muted">Formatos: JPG, PNG, GIF, WEBP</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-tc-primary">Guardar Usuario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+function toggleConductorFields() {
+    const rol = document.getElementById('selectRol').value;
+    const conductorFields = document.getElementById('conductorFields');
+    const inputLicencia = document.getElementById('inputLicencia');
+    const inputCategoria = document.getElementById('inputCategoria');
+    const inputUbicacion = document.getElementById('inputUbicacion');
+    if (rol === 'CONDUCTOR') {
+        conductorFields.classList.remove('d-none');
+        inputLicencia.required = true;
+        inputCategoria.required = true;
+        if (inputUbicacion) inputUbicacion.required = true;
+    } else {
+        conductorFields.classList.add('d-none');
+        inputLicencia.required = false;
+        inputCategoria.required = false;
+        if (inputUbicacion) inputUbicacion.required = false;
+    }
+}
+</script>
+
+{% for u in usuarios %}
+<div class="modal fade" id="modalEditarUsuario{{ u.id|string }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-primary">Editar Usuario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/usuarios/{{ u.id|string }}/editar" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Nombre(s)</label>
+                            <input type="text" name="nombre" class="form-control" value="{{ u.nombre }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Apellido(s)</label>
+                            <input type="text" name="apellido" class="form-control" value="{{ u.apellido }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">C.I.</label>
+                            <input type="text" name="ci" class="form-control" value="{{ u.ci }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Correo Electrónico</label>
+                            <input type="email" name="email" class="form-control" value="{{ u.email }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mt-4 pt-2">
+                                <input class="form-check-input" type="checkbox" name="estado" id="estadoCheck{{ u.id|string }}" {% if u.estado %}checked{% endif %}>
+                                <label class="form-check-label fw-semibold" for="estadoCheck{{ u.id|string }}">
+                                    Usuario Activo
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Rol Asignado</label>
+                            <input type="text" class="form-control bg-light" value="{{ u.rol.value|sin_guion }}" disabled>
+                            <small class="text-muted">El rol no puede ser modificado por seguridad.</small>
+                        </div>
+                    </div>
+                    {% if u.rol.value == 'CONDUCTOR' %}
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Licencia de Conducir</label>
+                            <input type="text" name="licencia_conducir" class="form-control" value="{{ u.conductor.licencia_conducir if u.conductor else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Categoría de Licencia</label>
+                            <select name="categoria_licencia" class="form-select">
+                                <option value="C" {% if u.conductor and u.conductor.categoria_licencia == 'C' %}selected{% endif %}>Categoría C</option>
+                                <option value="B" {% if u.conductor and u.conductor.categoria_licencia == 'B' %}selected{% endif %}>Categoría B</option>
+                                <option value="A" {% if u.conductor and u.conductor.categoria_licencia == 'A' %}selected{% endif %}>Categoría A</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Ubicación Actual (Ciudad)</label>
+                            <select name="ubicacion_actual" class="form-select">
+                                <option value="Cochabamba" {% if not u.conductor or u.conductor.ubicacion_actual == 'Cochabamba' %}selected{% endif %}>Cochabamba</option>
+                                <option value="La Paz" {% if u.conductor and u.conductor.ubicacion_actual == 'La Paz' %}selected{% endif %}>La Paz</option>
+                                <option value="Santa Cruz" {% if u.conductor and u.conductor.ubicacion_actual == 'Santa Cruz' %}selected{% endif %}>Santa Cruz</option>
+                                <option value="Oruro" {% if u.conductor and u.conductor.ubicacion_actual == 'Oruro' %}selected{% endif %}>Oruro</option>
+                                <option value="Sucre" {% if u.conductor and u.conductor.ubicacion_actual == 'Sucre' %}selected{% endif %}>Sucre</option>
+                                <option value="Potosí" {% if u.conductor and u.conductor.ubicacion_actual == 'Potosí' %}selected{% endif %}>Potosí</option>
+                                <option value="Tarija" {% if u.conductor and u.conductor.ubicacion_actual == 'Tarija' %}selected{% endif %}>Tarija</option>
+                            </select>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-12">
+                            <label class="form-label small fw-semibold">Fotografía del Usuario</label>
+                            {% if u.foto_url %}
+                            <div class="mb-2">
+                                <img src="{{ u.foto_url }}" alt="{{ u.nombre }}" class="img-fluid rounded-circle border" style="width: 80px; height: 80px; object-fit: cover;">
+                            </div>
+                            {% endif %}
+                            <input type="file" name="foto" class="form-control" accept=".jpg,.jpeg,.png,.gif,.webp">
+                            <small class="text-muted">Dejar vacío para mantener la foto actual.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-tc-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% endif %}
+
+{% endblock %}
