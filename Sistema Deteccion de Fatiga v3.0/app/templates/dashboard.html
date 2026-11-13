@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+        <h2 class="h3 fw-bold mb-0 text-dark">Panel de Control Operativo</h2>
+        <p class="text-muted small mb-0">Bienvenido, {{ current_user.nombre }} {{ current_user.apellido }}</p>
+    </div>
+    <div>
+        <span class="badge bg-danger px-3 py-2 fs-6">ROL: {{ current_user.rol.value|sin_guion }}</span>
+    </div>
+</div>
+
+<!-- ========================================================
+     VISTA DEL ADMINISTRADOR (JEFE DE OPERACIONES)
+     ======================================================== -->
+{% if current_user.rol.value == 'ADMIN' %}
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card card-formal p-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small text-uppercase fw-semibold">Personal Registrado</div>
+                    <div class="fs-4 fw-bold text-danger">{{ stats.total_usuarios }}</div>
+                </div>
+                <i class="fa-solid fa-users fa-2x text-muted opacity-50"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-formal p-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small text-uppercase fw-semibold">Conductores Habilitados</div>
+                    <div class="fs-4 fw-bold text-danger">{{ stats.total_conductores }}</div>
+                </div>
+                <i class="fa-solid fa-id-card fa-2x text-muted opacity-50"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-formal p-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small text-uppercase fw-semibold">Buses en Flota</div>
+                    <div class="fs-4 fw-bold text-danger">{{ stats.total_vehiculos }}</div>
+                </div>
+                <i class="fa-solid fa-bus-simple fa-2x text-muted opacity-50"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h4 class="h5 fw-bold mb-3">Módulos de Gestión Operativa</h4>
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card card-formal h-100">
+            <div class="card-formal-header d-flex justify-content-between align-items-center">
+                <span>Personal y Conductores</span>
+                <i class="fa-solid fa-user-gear text-danger"></i>
+            </div>
+            <div class="card-body">
+                <p class="card-text text-muted small">
+                    Alta, baja lógica y modificación de choferes con categoría de licencia, base actual y contactos de emergencia.
+                </p>
+                <a href="/usuarios" class="btn btn-sm btn-tc-primary w-100">Gestionar Personal</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card card-formal h-100">
+            <div class="card-formal-header d-flex justify-content-between align-items-center">
+                <span>Flota de Buses</span>
+                <i class="fa-solid fa-bus text-danger"></i>
+            </div>
+            <div class="card-body">
+                <p class="card-text text-muted small">
+                    Catálogo de buses por número interno (1FN), chasis, carrocería, tipo de unidad y control de estado disponible/tránsito.
+                </p>
+                <a href="/flota" class="btn btn-sm btn-tc-primary w-100">Gestionar Flota</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card card-formal h-100">
+            <div class="card-formal-header d-flex justify-content-between align-items-center">
+                <span>Hojas de Ruta y Pre-Despacho</span>
+                <i class="fa-solid fa-file-invoice text-danger"></i>
+            </div>
+            <div class="card-body">
+                <p class="card-text text-muted small">
+                    Programación en cascada con cálculo oficial ABC/ATT, doble conductor y control estricto de alcotest en terminal.
+                </p>
+                <div class="d-flex gap-2">
+                    <a href="/hojas-ruta" class="btn btn-sm btn-tc-primary w-50">Hojas de Ruta</a>
+                    <a href="/pre-despacho" class="btn btn-sm btn-tc-outline w-50">Pre-Despacho</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================
+     VISTA DEL OPERADOR (CENTRO DE CONTROL Y MONITOREO)
+     ======================================================== -->
+{% elif current_user.rol.value == 'OPERADOR' %}
+<div class="row g-3 mb-4">
+    <div class="col-md-12">
+        <div class="card card-formal border-start border-4 border-danger shadow-sm">
+            <div class="card-formal-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fa-solid fa-tower-broadcast text-danger me-2"></i>
+                    <span class="fw-bold">Centro de Control y Monitoreo Geoespacial (Leaflet.js)</span>
+                </div>
+                <span class="badge bg-success">OPERATIVO EN VIVO</span>
+            </div>
+            <div class="card-body p-4">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h5 class="fw-bold text-dark mb-2">Rastreo Satelital y Protocolo de Parada Segura (PPS)</h5>
+                        <p class="text-muted mb-3">
+                            Supervisión en tiempo real de unidades en carretera interdepartamental, recepción de alertas por exceso de velocidad y fatiga, e intervención inmediata con emisión de órdenes de descanso, notas de voz y mensajes directos a cabina.
+                        </p>
+                        <div class="d-flex gap-3 text-muted small mb-3">
+                            <div><i class="fa-solid fa-route text-danger me-1"></i> Viajes en Tránsito: <strong>{{ stats.hojas_en_transito }}</strong></div>
+                            <div><i class="fa-solid fa-clock text-warning me-1"></i> Por Despachar: <strong>{{ stats.hojas_pendientes }}</strong></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <a href="/monitoreo" class="btn btn-lg btn-tc-primary w-100 py-3 shadow">
+                            <i class="fa-solid fa-map-location-dot me-2"></i> Abrir Centro de Monitoreo
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================
+     VISTA DEL CONDUCTOR (MÓVIL / MI VIAJE ASIGNADO)
+     ======================================================== -->
+{% elif current_user.rol.value == 'CONDUCTOR' %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        {% if viaje_activo %}
+        <div class="card card-formal border-start border-4 border-danger shadow">
+            <div class="card-formal-header d-flex justify-content-between align-items-center bg-light">
+                <div>
+                    <i class="fa-solid fa-bus text-danger me-2"></i>
+                    <span class="fw-bold">Tu Viaje Programado de Hoy</span>
+                </div>
+                <span class="badge {% if viaje_activo.estado.value == 'EN_TRANSITO' %}bg-success{% elif viaje_activo.estado.value == 'AUTORIZADA' %}bg-primary{% else %}bg-warning text-dark{% endif %} px-3 py-2">
+                    {{ viaje_activo.estado.value|sin_guion }}
+                </span>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-8">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="fs-4 fw-bold text-dark me-3">
+                                {{ viaje_activo.origen_ciudad }}
+                            </div>
+                            <i class="fa-solid fa-arrow-right-long text-danger fs-5 me-3"></i>
+                            <div class="fs-4 fw-bold text-dark">
+                                {{ viaje_activo.destino_ciudad }}
+                            </div>
+                        </div>
+
+                        <div class="row g-2 text-muted small mb-3">
+                            <div class="col-sm-6">
+                                <div><i class="fa-solid fa-building me-1 text-danger"></i> <strong>Terminal Salida:</strong> {{ viaje_activo.origen_terminal }}</div>
+                                <div><i class="fa-solid fa-location-dot me-1 text-danger"></i> <strong>Terminal Llegada:</strong> {{ viaje_activo.destino_terminal }}</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div><i class="fa-solid fa-bus-simple me-1 text-danger"></i> <strong>Bus Asignado:</strong> Interno #{{ viaje_activo.vehiculo.numero_interno }} ({{ viaje_activo.vehiculo.placa }})</div>
+                                <div><i class="fa-solid fa-clock me-1 text-danger"></i> <strong>Salida Programada:</strong> {{ viaje_activo.fecha_salida.strftime('%d/%m/%Y %H:%M') }}</div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-light border py-2 px-3 small mb-0">
+                            <i class="fa-solid fa-circle-info text-primary me-1"></i>
+                            Código de Hoja: <strong class="text-dark">{{ viaje_activo.codigo_hoja }}</strong> |
+                            Duración Estimada: <strong class="text-dark">{{ viaje_activo.duracion_estimada_hrs }} hrs</strong>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4 text-center">
+                        <a href="/mi-hoja" class="btn btn-lg btn-tc-primary w-100 py-3 shadow">
+                            <i class="fa-solid fa-location-arrow me-2"></i> Ir a Mi Hoja de Ruta
+                        </a>
+                        <div class="text-muted small mt-2">Transmisión de viaje, telemetría y alertas</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card card-formal p-5 text-center">
+            <div class="mb-3">
+                <i class="fa-solid fa-calendar-check fa-3x text-muted opacity-50"></i>
+            </div>
+            <h5 class="fw-bold text-dark">Sin Viajes Asignados Actualmente</h5>
+            <p class="text-muted small mb-3">
+                No tienes ninguna hoja de ruta activa o en preparación en este momento. Cuando el Jefe de Operaciones te programe un servicio, aparecerá aquí automáticamente.
+            </p>
+            <div>
+                <a href="/mi-hoja" class="btn btn-tc-outline px-4">
+                    <i class="fa-solid fa-clock-rotate-left me-1"></i> Ver Historial de Viajes Pasados
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+
+{% block title %}Flota de Buses - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+        <h2 class="h3 fw-bold mb-0 text-dark">Flota de Unidades de Transporte</h2>
+        <p class="text-muted small mb-0">Catálogo oficial de buses interdepartamentales de Trans Copacabana S.A.</p>
+    </div>
+    {% if current_user.rol.value == 'ADMIN' %}
+    <button type="button" class="btn btn-tc-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoBus">
+        <i class="fa-solid fa-plus me-1"></i> Registrar Unidad
+    </button>
+    {% endif %}
+</div>
+
+<!-- Barra de Filtros y Búsqueda -->
+<div class="card card-formal mb-3">
+    <div class="card-body p-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                    <input type="text" id="filtroBuscarBuses" class="form-control" placeholder="Buscar por TC-XXX, placa, modelo, SOAT..." onkeyup="filtrarTablaFlota()">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select id="filtroEstadoBus" class="form-select" onchange="filtrarTablaFlota()">
+                    <option value="">Todos los Estados</option>
+                    <option value="DISPONIBLE">Disponible</option>
+                    <option value="EN_TRANSITO">En Tránsito</option>
+                    <option value="MANTENIMIENTO">Mantenimiento</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select id="filtroMarcaBus" class="form-select" onchange="filtrarTablaFlota()">
+                    <option value="">Todas las Marcas</option>
+                    <option value="Mercedes-Benz">Mercedes-Benz</option>
+                    <option value="Scania">Scania</option>
+                    <option value="Volvo">Volvo</option>
+                    <option value="MAN">MAN</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select id="filtroTipoBus" class="form-select" onchange="filtrarTablaFlota()">
+                    <option value="">Todos los Tipos</option>
+                    <option value="CAMA">Cama</option>
+                    <option value="SEMI_CAMA">Semi-Cama</option>
+                    <option value="LEITO">Leito</option>
+                    <option value="NORMAL">Normal</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select id="filtroUbicacionBus" class="form-select" onchange="filtrarTablaFlota()">
+                    <option value="">Todas las Ciudades</option>
+                    <option value="Cochabamba">Cochabamba</option>
+                    <option value="La Paz">La Paz</option>
+                    <option value="Santa Cruz">Santa Cruz</option>
+                    <option value="Oruro">Oruro</option>
+                    <option value="Sucre">Sucre</option>
+                    <option value="Potosí">Potosí</option>
+                    <option value="Tarija">Tarija</option>
+                </select>
+            </div>
+            <div class="col-md-1 text-md-end">
+                <span id="contadorBuses" class="badge bg-light text-dark border p-2 w-100 text-center">
+                    {{ vehiculos|length }}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-formal">
+    <div class="table-responsive">
+        <table class="table table-hover table-formal align-middle mb-0" id="tablaFlota">
+            <thead>
+                <tr>
+                    <th>Nº Interno</th>
+                    <th>Placa</th>
+                    <th>Tipo de Bus</th>
+                    <th>Marca y Modelo</th>
+                    <th>SOAT / Vigencia</th>
+                    <th>Cámara Cabina</th>
+                    <th>Ubicación Actual</th>
+                    <th>Estado Operativo</th>
+                    {% if current_user.rol.value == 'ADMIN' %}
+                    <th>Acciones</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in vehiculos %}
+                <tr class="fila-bus"
+                    data-search="{{ b.numero_interno|lower }} {{ b.placa|lower }} {{ b.marca|lower }} {{ b.modelo|lower }} {{ (b.soat_numero or '')|lower }} {{ (b.carroceria or '')|lower }}"
+                    data-estado="{{ b.estado.value }}"
+                    data-marca="{{ b.marca }}"
+                    data-tipo="{{ b.tipo_bus.value if b.tipo_bus else '' }}"
+                    data-ubicacion="{{ b.ubicacion_actual or '' }}">
+                    <td class="fw-bold text-danger">
+                        {% if b.foto_url %}
+                        <img src="{{ b.foto_url }}" alt="Bus" class="rounded me-2" style="width: 36px; height: 36px; object-fit: cover;">
+                        {% endif %}
+                        {{ b.numero_interno }}
+                    </td>
+                    <td><span class="badge bg-light text-dark border">{{ b.placa }}</span></td>
+                    <td>
+                        <span class="badge bg-secondary">{{ (b.tipo_bus.value if b.tipo_bus else 'NORMAL')|sin_guion }}</span>
+                    </td>
+                    <td>
+                        <div class="fw-semibold">{{ b.marca }}</div>
+                        <div class="text-muted small">{{ b.modelo }}</div>
+                    </td>
+                    <td>
+                        {% if b.soat_numero %}
+                        <div class="small fw-semibold text-dark">{{ b.soat_numero }}</div>
+                        <div class="text-muted small">
+                            Vence: {{ b.soat_vigencia.strftime('%Y-%m-%d') if b.soat_vigencia else 'N/R' }}
+                        </div>
+                        {% else %}
+                        <span class="text-muted small">Sin SOAT</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-dark">
+                            <i class="fa-solid fa-video me-1"></i>CAM-{{ b.numero_interno }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border">
+                            <i class="fa-solid fa-location-dot text-danger me-1"></i>{{ b.ubicacion_actual or 'Cochabamba' }}
+                        </span>
+                        {% if b.terminal_actual %}
+                        <div class="text-muted small mt-1" style="font-size: 0.75rem;">
+                            {{ b.terminal_actual }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if b.estado.value == 'DISPONIBLE' %}
+                        <span class="badge bg-success">DISPONIBLE</span>
+                        {% elif b.estado.value == 'EN_TRANSITO' %}
+                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-bus me-1"></i>EN TRANSITO</span>
+                        {% else %}
+                        <span class="badge bg-secondary">MANTENIMIENTO</span>
+                        {% endif %}
+                    </td>
+                    {% if current_user.rol.value == 'ADMIN' %}
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditarBus{{ b.id|string }}">
+                            <i class="fa-solid fa-pen"></i> Editar
+                        </button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center py-4 text-muted">No existen vehículos registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Registrar Bus -->
+{% if current_user.rol.value == 'ADMIN' %}
+<div class="modal fade" id="modalNuevoBus" tabindex="-1" aria-labelledby="modalNuevoBusLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger" id="modalNuevoBusLabel">
+                    Registrar Unidad en Flota
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/flota/nuevo" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Número Interno</label>
+                            <input type="text" name="numero_interno" class="form-control fw-bold bg-light"
+                                   value="{{ proximo_numero_interno }}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Cámara Asociada</label>
+                            <input type="text" class="form-control fw-bold bg-light"
+                                   value="CAM-{{ proximo_numero_interno }}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Placa Boliviana <span class="text-danger">*</span></label>
+                            <input type="text" name="placa" class="form-control text-uppercase" placeholder="Ej. 1022-CBB o 4512-PTY" required
+                                   pattern="^[0-9]{3,4}-?[A-Za-z]{3}$"
+                                   title="Formato boliviano válido (ej. 1022-CBB o 4512-PTY).">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Marca Homologada <span class="text-danger">*</span></label>
+                            <select name="marca" id="selectMarcaNuevo" class="form-select" required onchange="onMarcaCambiadoNuevo()">
+                                <option value="">-- Seleccione Marca --</option>
+                                <option value="Mercedes-Benz">Mercedes-Benz</option>
+                                <option value="Scania">Scania</option>
+                                <option value="Volvo">Volvo</option>
+                                <option value="MAN">MAN</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Modelo de Chasis / Motor <span class="text-danger">*</span></label>
+                            <select name="modelo" id="selectModeloNuevo" class="form-select" required>
+                                <option value="">-- Seleccione Marca primero --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Carrocería</label>
+                            <input type="text" name="carroceria" class="form-control" placeholder="Ej. Marcopolo Paradiso G8 1800 DD / Irizar i6">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Número de SOAT</label>
+                            <input type="text" name="soat_numero" class="form-control text-uppercase" placeholder="Ej. SOAT-2026-00022"
+                                   pattern="^[A-Za-z0-9-]{5,30}$"
+                                   title="Número alfanumérico de 5 a 30 caracteres.">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Vigencia SOAT</label>
+                            <input type="date" name="soat_vigencia" class="form-control" value="2026-12-31">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Tipo de Bus</label>
+                            <select name="tipo_bus" class="form-select" required>
+                                <option value="CAMA">Cama</option>
+                                <option value="SEMI_CAMA" selected>Semi-Cama</option>
+                                <option value="LEITO">Leito</option>
+                                <option value="NORMAL">Normal</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Capacidad de Pasajeros</label>
+                            <input type="number" name="capacidad_pasajeros" class="form-control" value="43" min="10" max="90">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Año de Fabricación</label>
+                            <input type="number" name="anio_fabricacion" class="form-control" value="2024" min="1990" max="2027">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Ubicación Inicial (Ciudad)</label>
+                            <select name="ubicacion_actual" id="nuevo_bus_ciudad" class="form-select" onchange="onCiudadChangeNuevoBus()">
+                                <option value="Cochabamba" selected>Cochabamba</option>
+                                <option value="La Paz">La Paz</option>
+                                <option value="Santa Cruz">Santa Cruz</option>
+                                <option value="Oruro">Oruro</option>
+                                <option value="Sucre">Sucre</option>
+                                <option value="Potosí">Potosí</option>
+                                <option value="Tarija">Tarija</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Terminal Inicial</label>
+                            <select name="terminal_actual" id="nuevo_bus_terminal" class="form-select">
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label small fw-semibold">Fotografía del Bus</label>
+                            <input type="file" name="foto" class="form-control" accept=".jpg,.jpeg,.png,.gif,.webp">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-tc-primary">Guardar Unidad</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modales Editar Bus -->
+{% for b in vehiculos %}
+<div class="modal fade" id="modalEditarBus{{ b.id|string }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-primary">
+                    Editar Bus {{ b.numero_interno }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/flota/{{ b.id|string }}/editar" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Número Interno</label>
+                            <input type="text" name="numero_interno" class="form-control fw-bold bg-light" value="{{ b.numero_interno }}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Cámara Cabina</label>
+                            <input type="text" class="form-control bg-light" value="CAM-{{ b.numero_interno }}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Placa Boliviana <span class="text-danger">*</span></label>
+                            <input type="text" name="placa" class="form-control text-uppercase" value="{{ b.placa }}" required
+                                   pattern="^[0-9]{3,4}-?[A-Za-z]{3}$"
+                                   title="Formato boliviano válido (ej. 1022-CBB).">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Marca Homologada</label>
+                            <select name="marca" class="form-select" required>
+                                <option value="Mercedes-Benz" {% if b.marca == 'Mercedes-Benz' %}selected{% endif %}>Mercedes-Benz</option>
+                                <option value="Scania" {% if b.marca == 'Scania' %}selected{% endif %}>Scania</option>
+                                <option value="Volvo" {% if b.marca == 'Volvo' %}selected{% endif %}>Volvo</option>
+                                <option value="MAN" {% if b.marca == 'MAN' %}selected{% endif %}>MAN</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Modelo</label>
+                            <input type="text" name="modelo" class="form-control" value="{{ b.modelo }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Carrocería</label>
+                            <input type="text" name="carroceria" class="form-control" value="{{ b.carroceria or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Número de SOAT</label>
+                            <input type="text" name="soat_numero" class="form-control text-uppercase" value="{{ b.soat_numero or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Vigencia SOAT</label>
+                            <input type="date" name="soat_vigencia" class="form-control" value="{{ b.soat_vigencia.strftime('%Y-%m-%d') if b.soat_vigencia else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Tipo de Bus</label>
+                            <select name="tipo_bus" class="form-select">
+                                <option value="CAMA" {% if b.tipo_bus.value == 'CAMA' %}selected{% endif %}>Cama</option>
+                                <option value="SEMI_CAMA" {% if b.tipo_bus.value == 'SEMI_CAMA' %}selected{% endif %}>Semi-Cama</option>
+                                <option value="LEITO" {% if b.tipo_bus.value == 'LEITO' %}selected{% endif %}>Leito</option>
+                                <option value="NORMAL" {% if b.tipo_bus.value == 'NORMAL' %}selected{% endif %}>Normal</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Capacidad de Pasajeros</label>
+                            <input type="number" name="capacidad_pasajeros" class="form-control" value="{{ b.capacidad_pasajeros }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Estado Operativo</label>
+                            <select name="estado" class="form-select" {% if b.estado.value == 'EN_TRANSITO' %}disabled{% endif %}>
+                                <option value="DISPONIBLE" {% if b.estado.value == 'DISPONIBLE' %}selected{% endif %}>DISPONIBLE</option>
+                                <option value="MANTENIMIENTO" {% if b.estado.value == 'MANTENIMIENTO' %}selected{% endif %}>MANTENIMIENTO</option>
+                                {% if b.estado.value == 'EN_TRANSITO' %}
+                                <option value="EN_TRANSITO" selected>EN TRANSITO (Bloqueado por viaje)</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Ubicación Actual (Ciudad)</label>
+                            <select name="ubicacion_actual" class="form-select">
+                                <option value="Cochabamba" {% if b.ubicacion_actual == 'Cochabamba' %}selected{% endif %}>Cochabamba</option>
+                                <option value="La Paz" {% if b.ubicacion_actual == 'La Paz' %}selected{% endif %}>La Paz</option>
+                                <option value="Santa Cruz" {% if b.ubicacion_actual == 'Santa Cruz' %}selected{% endif %}>Santa Cruz</option>
+                                <option value="Oruro" {% if b.ubicacion_actual == 'Oruro' %}selected{% endif %}>Oruro</option>
+                                <option value="Sucre" {% if b.ubicacion_actual == 'Sucre' %}selected{% endif %}>Sucre</option>
+                                <option value="Potosí" {% if b.ubicacion_actual == 'Potosí' %}selected{% endif %}>Potosí</option>
+                                <option value="Tarija" {% if b.ubicacion_actual == 'Tarija' %}selected{% endif %}>Tarija</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Terminal Actual</label>
+                            <input type="text" name="terminal_actual" class="form-control" value="{{ b.terminal_actual or '' }}">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label small fw-semibold">Fotografía del Bus</label>
+                            {% if b.foto_url %}
+                            <div class="mb-2">
+                                <img src="{{ b.foto_url }}" alt="Bus" class="img-fluid rounded border" style="max-height: 120px;">
+                            </div>
+                            {% endif %}
+                            <input type="file" name="foto" class="form-control" accept=".jpg,.jpeg,.png,.gif,.webp">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-tc-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% endif %}
+
+<script>
+const MODELOS_POR_MARCA = {
+    "Mercedes-Benz": [
+        "O-500 RSD 2442",
+        "O-500 RS 1936",
+        "OF-1721"
+    ],
+    "Scania": [
+        "K440 IB 6x2",
+        "K400 IB 4x2",
+        "K410 IB 6x2*4"
+    ],
+    "Volvo": [
+        "B430R 6x2",
+        "B450R 8x2",
+        "B380R 4x2"
+    ],
+    "MAN": [
+        "Lion's Coach",
+        "19.400 RR2"
+    ]
+};
+
+function onMarcaCambiadoNuevo() {
+    const marca = document.getElementById('selectMarcaNuevo').value;
+    const selectModelo = document.getElementById('selectModeloNuevo');
+    selectModelo.innerHTML = '';
+    
+    if (MODELOS_POR_MARCA[marca]) {
+        MODELOS_POR_MARCA[marca].forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            selectModelo.appendChild(opt);
+        });
+    } else {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- Seleccione Marca primero --';
+        selectModelo.appendChild(opt);
+    }
+}
+
+const terminalesPorCiudad = {{ terminales_por_ciudad | tojson | safe }};
+
+function onCiudadChangeNuevoBus() {
+    const ciudad = document.getElementById('nuevo_bus_ciudad').value;
+    const terminalSelect = document.getElementById('nuevo_bus_terminal');
+    terminalSelect.innerHTML = '';
+    if (terminalesPorCiudad && terminalesPorCiudad[ciudad]) {
+        terminalesPorCiudad[ciudad].forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            terminalSelect.appendChild(opt);
+        });
+    }
+}
+
+function filtrarTablaFlota() {
+    const texto = (document.getElementById('filtroBuscarBuses').value || '').trim().toLowerCase();
+    const estado = document.getElementById('filtroEstadoBus').value;
+    const marca = document.getElementById('filtroMarcaBus').value;
+    const tipo = document.getElementById('filtroTipoBus').value;
+    const ubicacion = document.getElementById('filtroUbicacionBus').value;
+    const filas = document.querySelectorAll('.fila-bus');
+    let visibles = 0;
+
+    filas.forEach(f => {
+        const searchVal = f.getAttribute('data-search') || '';
+        const estadoVal = f.getAttribute('data-estado') || '';
+        const marcaVal = f.getAttribute('data-marca') || '';
+        const tipoVal = f.getAttribute('data-tipo') || '';
+        const ubicacionVal = f.getAttribute('data-ubicacion') || '';
+
+        const cumpleTexto = !texto || searchVal.includes(texto);
+        const cumpleEstado = !estado || estadoVal === estado;
+        const cumpleMarca = !marca || marcaVal === marca;
+        const cumpleTipo = !tipo || tipoVal === tipo;
+        const cumpleUbicacion = !ubicacion || ubicacionVal === ubicacion;
+
+        if (cumpleTexto && cumpleEstado && cumpleMarca && cumpleTipo && cumpleUbicacion) {
+            f.style.display = '';
+            visibles++;
+        } else {
+            f.style.display = 'none';
+        }
+    });
+
+    const contador = document.getElementById('contadorBuses');
+    if (contador) {
+        contador.textContent = `${visibles} de ${filas.length}`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    onCiudadChangeNuevoBus();
+});
+</script>
+
+{% endblock %}

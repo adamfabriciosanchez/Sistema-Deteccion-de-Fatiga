@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}Pre-Despacho (Alcotest) - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+        <h2 class="h3 fw-bold mb-0 text-dark">Estación de Pre-Despacho Técnico (Terminal)</h2>
+        <p class="text-muted small mb-0">Control estricto de alcoholemia individual (0.00 mg/L) exclusivo del Jefe de Operaciones</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Hojas pendientes de validación de alcotest -->
+    <div class="col-lg-7">
+        <div class="card card-formal">
+            <div class="card-formal-header d-flex justify-content-between align-items-center">
+                <span>Despachos Pendientes de Alcotest</span>
+                <span class="badge bg-warning text-dark">{{ hojas_pendientes|length }} Pendientes</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-formal align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Despacho</th>
+                                <th>Unidad e Itinerario</th>
+                                <th>Tripulación a Evaluar</th>
+                                <th class="text-center">Control</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for h in hojas_pendientes %}
+                            <tr>
+                                <td class="fw-bold text-danger">{{ h.codigo_hoja }}</td>
+                                <td>
+                                    <div class="fw-semibold">Interno {{ h.vehiculo.numero_interno }} ({{ h.vehiculo.placa }})</div>
+                                    <div class="text-muted small">{{ h.origen_ciudad }} &rarr; {{ h.destino_ciudad }}</div>
+                                    <div class="text-muted small">Terminal: {{ h.origen_terminal }}</div>
+                                </td>
+                                <td>
+                                    {% for t in h.tripulacion %}
+                                    <div class="mb-1">
+                                        {% if t.tipo_conductor.value == 'PRINCIPAL' %}
+                                        <span class="badge bg-danger">PRINCIPAL</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">RELEVO</span>
+                                        {% endif %}
+                                        <span class="small fw-semibold ms-1">{{ t.conductor.usuario.nombre }} {{ t.conductor.usuario.apellido }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-tc-primary" data-bs-toggle="modal" data-bs-target="#modalAlcotest{{ h.id }}">
+                                        <i class="fa-solid fa-vial me-1"></i> Alcotest
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <!-- Modal Validación Alcotest para cada hoja -->
+                            <div class="modal fade" id="modalAlcotest{{ h.id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header border-bottom-0 pb-0">
+                                            <h5 class="modal-title fw-bold text-danger">
+                                                <i class="fa-solid fa-vial-virus me-1"></i> Control de Alcoholemia: {{ h.codigo_hoja }}
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <form action="/pre-despacho/validar" method="POST">
+                                            <input type="hidden" name="hoja_de_ruta_id" value="{{ h.id }}">
+                                            <div class="modal-body">
+                                                <div class="p-3 bg-light rounded border mb-3">
+                                                    <div class="row small">
+                                                        <div class="col-md-6">
+                                                            <div><strong>Unidad:</strong> Bus Interno {{ h.vehiculo.numero_interno }} ({{ h.vehiculo.placa }})</div>
+                                                            <div><strong>Trayecto:</strong> {{ h.origen_ciudad }} &rarr; {{ h.destino_ciudad }}</div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div><strong>Salida:</strong> {{ h.fecha_salida.strftime('%d/%m/%Y %H:%M') }}</div>
+                                                            <div><strong>Duración:</strong> {{ h.duracion_estimada_hrs }} hrs</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Evaluación Conductor Principal -->
+                                                {% for t in h.tripulacion if t.tipo_conductor.value == 'PRINCIPAL' %}
+                                                <div class="p-3 border rounded mb-3 bg-white shadow-sm">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <div>
+                                                            <span class="badge bg-danger me-2">CONDUCTOR PRINCIPAL</span>
+                                                            <strong class="text-dark">{{ t.conductor.usuario.nombre }} {{ t.conductor.usuario.apellido }}</strong>
+                                                            <span class="text-muted small ms-2">(Licencia {{ t.conductor.licencia_conducir }})</span>
+                                                        </div>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalCambiarChofer{{ h.id }}_P">
+                                                            <i class="fa-solid fa-user-pen me-1"></i> Cambiar
+                                                        </button>
+                                                    </div>
+                                                    <label class="form-label small fw-semibold">Resultado de Prueba de Alcotest (mg/L)</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text"><i class="fa-solid fa-vial text-danger"></i></span>
+                                                        <input type="number" step="0.01" min="0" max="5.0" name="resultado_alcotest_principal" class="form-control form-control-lg" value="0.00" required>
+                                                        <span class="input-group-text">mg/L</span>
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+
+                                                <!-- Evaluación Conductor de Relevo (si existe) -->
+                                                {% set tiene_relevo = [] %}
+                                                {% for t in h.tripulacion if t.tipo_conductor.value == 'RELEVO' %}
+                                                {% set _ = tiene_relevo.append(1) %}
+                                                <div class="p-3 border rounded mb-3 bg-white shadow-sm">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <div>
+                                                            <span class="badge bg-secondary me-2">CONDUCTOR DE RELEVO</span>
+                                                            <strong class="text-dark">{{ t.conductor.usuario.nombre }} {{ t.conductor.usuario.apellido }}</strong>
+                                                            <span class="text-muted small ms-2">(Licencia {{ t.conductor.licencia_conducir }})</span>
+                                                        </div>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalCambiarChofer{{ h.id }}_R">
+                                                            <i class="fa-solid fa-user-pen me-1"></i> Cambiar
+                                                        </button>
+                                                    </div>
+                                                    <label class="form-label small fw-semibold">Resultado de Prueba de Alcotest (mg/L)</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text"><i class="fa-solid fa-vial text-secondary"></i></span>
+                                                        <input type="number" step="0.01" min="0" max="5.0" name="resultado_alcotest_relevo" class="form-control form-control-lg" value="0.00" required>
+                                                        <span class="input-group-text">mg/L</span>
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-semibold">Observaciones de Terminal</label>
+                                                    <textarea name="observaciones" class="form-control" rows="2" placeholder="Sin observaciones en inspección técnica y estado psicofísico."></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer border-top-0">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-tc-primary">
+                                                    <i class="fa-solid fa-check-to-slot me-1"></i> Registrar Alcotest y Validar
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Modales auxiliares para cambio rápido de chofer desde el pre-despacho -->
+                            <div class="modal fade" id="modalCambiarChofer{{ h.id }}_P" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form action="/hojas-ruta/{{ h.id }}/reasignar" method="POST">
+                                            <input type="hidden" name="tipo_conductor" value="PRINCIPAL">
+                                            <div class="modal-header">
+                                                <h6 class="modal-title fw-bold">Reemplazar Conductor Principal</h6>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="alert alert-light border small mb-3">
+                                                    Selecciona un conductor disponible en <strong>{{ h.origen_ciudad }}</strong>.
+                                                </div>
+                                                <label class="form-label small fw-semibold">Nuevo Conductor Principal</label>
+                                                <select name="nuevo_conductor_id" class="form-select" required>
+                                                    <option value="">-- Seleccionar Chofer --</option>
+                                                    {% for c in conductores_disponibles %}
+                                                    {% if c.ubicacion_actual and c.ubicacion_actual.strip().lower() == h.origen_ciudad.strip().lower() %}
+                                                    <option value="{{ c.id }}">{{ c.usuario.nombre }} {{ c.usuario.apellido }} (Lic. {{ c.licencia_conducir }})</option>
+                                                    {% endif %}
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="submit" class="btn btn-tc-primary btn-sm">Confirmar Reemplazo</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal fade" id="modalCambiarChofer{{ h.id }}_R" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form action="/hojas-ruta/{{ h.id }}/reasignar" method="POST">
+                                            <input type="hidden" name="tipo_conductor" value="RELEVO">
+                                            <div class="modal-header">
+                                                <h6 class="modal-title fw-bold">Reemplazar Conductor de Relevo</h6>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="alert alert-light border small mb-3">
+                                                    Selecciona un conductor disponible en <strong>{{ h.origen_ciudad }}</strong>.
+                                                </div>
+                                                <label class="form-label small fw-semibold">Nuevo Conductor de Relevo</label>
+                                                <select name="nuevo_conductor_id" class="form-select" required>
+                                                    <option value="">-- Seleccionar Chofer --</option>
+                                                    {% for c in conductores_disponibles %}
+                                                    {% if c.ubicacion_actual and c.ubicacion_actual.strip().lower() == h.origen_ciudad.strip().lower() %}
+                                                    <option value="{{ c.id }}">{{ c.usuario.nombre }} {{ c.usuario.apellido }} (Lic. {{ c.licencia_conducir }})</option>
+                                                    {% endif %}
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="submit" class="btn btn-tc-primary btn-sm">Confirmar Reemplazo</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">No hay hojas de ruta pendientes de validación en terminal.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hojas autorizadas listas para iniciar tránsito -->
+    <div class="col-lg-5">
+        <div class="card card-formal h-100">
+            <div class="card-formal-header d-flex justify-content-between align-items-center">
+                <span>Despachos Autorizados (Listos para Salida)</span>
+                <span class="badge bg-success">{{ hojas_autorizadas|length }} Autorizados</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for ha in hojas_autorizadas %}
+                    <div class="list-group-item p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="fw-bold mb-0 text-success">
+                                    <i class="fa-solid fa-circle-check me-1"></i> {{ ha.codigo_hoja }}
+                                </h6>
+                                <div class="small fw-semibold text-dark">
+                                    Bus Interno {{ ha.vehiculo.numero_interno }} | {{ ha.origen_ciudad }} &rarr; {{ ha.destino_ciudad }}
+                                </div>
+                            </div>
+                            <span class="badge bg-success">AUTORIZADA</span>
+                        </div>
+                        <div class="text-muted small mb-3">
+                            Alcotest Aprobado: <strong>0.00 mg/L</strong> | Terminal: {{ ha.origen_terminal }}
+                        </div>
+                        <form action="/hojas-ruta/{{ ha.id }}/iniciar-transito-web" method="POST">
+                            <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+                                <i class="fa-solid fa-bus me-1"></i> Confirmar Salida a Carretera
+                            </button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-center text-muted">
+                        No hay despachos autorizados esperando salida.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,604 @@
+{% extends "base.html" %}
+
+{% block title %}Hojas de Ruta - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+        <h2 class="h3 fw-bold mb-0 text-dark">Programación de Hojas de Ruta</h2>
+        <p class="text-muted small mb-0">Gestión de despachos técnicos con itinerario oficial boliviano y control ATT</p>
+    </div>
+    {% if current_user.rol.value == 'ADMIN' %}
+    <button type="button" class="btn btn-tc-primary" data-bs-toggle="modal" data-bs-target="#modalNuevaHoja">
+        <i class="fa-solid fa-plus me-1"></i> Programar Despacho
+    </button>
+    {% endif %}
+</div>
+
+<!-- Barra de Filtros y Búsqueda -->
+<div class="card card-formal mb-3">
+    <div class="card-body p-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                    <input type="text" id="filtroBuscarHojas" class="form-control" placeholder="Buscar por código, bus, conductor, terminal..." onkeyup="filtrarTablaHojas()">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select id="filtroEstadoHoja" class="form-select" onchange="filtrarTablaHojas()">
+                    <option value="">Todos los Estados</option>
+                    <option value="PRE_DESPACHO">Pre-Despacho</option>
+                    <option value="AUTORIZADA">Autorizada</option>
+                    <option value="EN_TRANSITO">En Tránsito</option>
+                    <option value="FINALIZADA">Finalizada</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select id="filtroOrigenHoja" class="form-select" onchange="filtrarTablaHojas()">
+                    <option value="">Todos los Orígenes</option>
+                    <option value="Cochabamba">Cochabamba</option>
+                    <option value="La Paz">La Paz</option>
+                    <option value="Santa Cruz">Santa Cruz</option>
+                    <option value="Oruro">Oruro</option>
+                    <option value="Sucre">Sucre</option>
+                    <option value="Potosí">Potosí</option>
+                    <option value="Tarija">Tarija</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select id="filtroDestinoHoja" class="form-select" onchange="filtrarTablaHojas()">
+                    <option value="">Todos los Destinos</option>
+                    <option value="Cochabamba">Cochabamba</option>
+                    <option value="La Paz">La Paz</option>
+                    <option value="Santa Cruz">Santa Cruz</option>
+                    <option value="Oruro">Oruro</option>
+                    <option value="Sucre">Sucre</option>
+                    <option value="Potosí">Potosí</option>
+                    <option value="Tarija">Tarija</option>
+                </select>
+            </div>
+            <div class="col-md-2 text-md-end">
+                <span id="contadorHojas" class="badge bg-light text-dark border p-2 w-100 text-center">
+                    {{ hojas|length }} despachos
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-formal">
+    <div class="table-responsive">
+        <table class="table table-hover table-formal align-middle mb-0" id="tablaHojas">
+            <thead>
+                <tr>
+                    <th>Código Despacho</th>
+                    <th>Bus Asignado</th>
+                    <th>Ruta Oficial y Duración</th>
+                    <th>Tripulación Asignada</th>
+                    <th>Fecha de Salida</th>
+                    <th>Estado</th>
+                    {% if current_user.rol.value == 'ADMIN' %}
+                    <th class="text-center">Acciones</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in hojas %}
+                <tr class="fila-hoja"
+                    data-search="{{ h.codigo_hoja|lower }} {{ h.vehiculo.numero_interno|lower }} {{ h.vehiculo.placa|lower }} {{ h.origen_ciudad|lower }} {{ h.destino_ciudad|lower }} {{ h.origen_terminal|lower }} {{ h.destino_terminal|lower }} {% for t in h.tripulacion %}{{ t.conductor.usuario.nombre|lower }} {{ t.conductor.usuario.apellido|lower }} {% endfor %}"
+                    data-estado="{{ h.estado.value }}"
+                    data-origen="{{ h.origen_ciudad }}"
+                    data-destino="{{ h.destino_ciudad }}">
+                    <td class="fw-bold text-danger">{{ h.codigo_hoja }}</td>
+                    <td>
+                        <div class="fw-semibold">Interno {{ h.vehiculo.numero_interno }}</div>
+                        <div class="text-muted small">{{ h.vehiculo.placa }} ({{ h.vehiculo.modelo }})</div>
+                    </td>
+                    <td>
+                        <div><strong>{{ h.origen_ciudad }}</strong> <i class="fa-solid fa-arrow-right text-muted mx-1"></i> <strong>{{ h.destino_ciudad }}</strong></div>
+                        <div class="text-muted small">{{ h.origen_terminal }} &rarr; {{ h.destino_terminal }}</div>
+                        <div class="text-muted small">Oficial: {{ h.distancia_km }} km | {{ h.duracion_estimada_hrs }} hrs</div>
+                    </td>
+                    <td>
+                        {% for t in h.tripulacion %}
+                        <div class="mb-1">
+                            {% if t.tipo_conductor.value == 'PRINCIPAL' %}
+                            <span class="badge bg-danger">PRINCIPAL</span>
+                            {% else %}
+                            <span class="badge bg-secondary">RELEVO</span>
+                            {% endif %}
+                            <span class="small fw-semibold ms-1">{{ t.conductor.usuario.nombre }} {{ t.conductor.usuario.apellido }}</span>
+                        </div>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        <div class="small fw-semibold">{{ h.fecha_salida.strftime('%Y-%m-%d %H:%M') }}</div>
+                        <div class="text-muted small">Llegada est.: {{ h.fecha_llegada_estimada.strftime('%Y-%m-%d %H:%M') }}</div>
+                    </td>
+                    <td>
+                        {% if h.estado.value == 'PRE_DESPACHO' %}
+                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-vial me-1"></i>PRE DESPACHO</span>
+                        {% elif h.estado.value == 'AUTORIZADA' %}
+                        <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>AUTORIZADA</span>
+                        {% elif h.estado.value == 'EN_TRANSITO' %}
+                        <span class="badge bg-primary"><i class="fa-solid fa-bus me-1"></i>EN TRANSITO</span>
+                        {% elif h.estado.value == 'FINALIZADA' %}
+                        <span class="badge bg-secondary">FINALIZADA</span>
+                        {% else %}
+                        <span class="badge bg-light text-dark border">{{ h.estado.value|sin_guion }}</span>
+                        {% endif %}
+                    </td>
+                    {% if current_user.rol.value == 'ADMIN' %}
+                    <td class="text-center">
+                        {% if h.estado.value == 'PRE_DESPACHO' %}
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalReasignar{{ h.id }}" title="Reasignar chofer">
+                            Reasignar
+                        </button>
+                        {% elif h.estado.value == 'EN_TRANSITO' %}
+                        <form action="/hojas-ruta/{{ h.id }}/finalizar-admin" method="POST" class="d-inline" onsubmit="return confirm('¿Confirmas finalizar este viaje administrativamente y liberar la unidad?');">
+                            <button type="submit" class="btn btn-sm btn-danger py-1" title="Finalizar Viaje">
+                                Finalizar
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="text-muted small">Concluido</span>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+
+                <!-- Modal Reasignar Chofer (Solo en PRE_DESPACHO) -->
+                {% if current_user.rol.value == 'ADMIN' and h.estado.value == 'PRE_DESPACHO' %}
+                <div class="modal fade" id="modalReasignar{{ h.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form action="/hojas-ruta/{{ h.id }}/reasignar" method="POST">
+                                <div class="modal-header">
+                                    <h5 class="modal-title fw-bold text-dark">
+                                        <i class="fa-solid fa-user-pen text-danger me-1"></i> Reasignar Tripulante ({{ h.codigo_hoja }})
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="alert alert-light border small mb-3">
+                                        Ciudad de salida: <strong>{{ h.origen_ciudad }}</strong>. Solo se listan conductores disponibles en esta base.
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Puesto de Tripulación</label>
+                                        <select name="tipo_conductor" class="form-select" required>
+                                            <option value="PRINCIPAL">Conductor Principal</option>
+                                            {% if h.duracion_estimada_hrs and h.duracion_estimada_hrs > 4.0 %}
+                                            <option value="RELEVO">Conductor de Relevo</option>
+                                            {% endif %}
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Nuevo Conductor Reemplazante</label>
+                                        <select name="nuevo_conductor_id" class="form-select" required>
+                                            <option value="">-- Seleccionar Conductor --</option>
+                                            {% for c in conductores %}
+                                            {% if c.ubicacion_actual and c.ubicacion_actual.strip().lower() == h.origen_ciudad.strip().lower() %}
+                                            <option value="{{ c.id }}">
+                                                {{ c.usuario.nombre }} {{ c.usuario.apellido }} (Lic. {{ c.licencia_conducir }})
+                                            </option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-tc-primary btn-sm">Confirmar Reasignación</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">No existen hojas de ruta programadas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ========================================================
+     MODAL PROGRAMAR DESPACHO (LÓGICA EN CASCADA OFICIAL)
+     ======================================================== -->
+{% if current_user.rol.value == 'ADMIN' %}
+<div class="modal fade" id="modalNuevaHoja" tabindex="-1" aria-labelledby="modalNuevaHojaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger" id="modalNuevaHojaLabel">
+                    <i class="fa-solid fa-calendar-plus me-1"></i> Programar Nueva Hoja de Ruta
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/hojas-ruta/nuevo" method="POST" id="formNuevaHoja">
+                <div class="modal-body">
+                    <!-- PASO 1: Código y Salida -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Código de Hoja de Ruta (Automático)</label>
+                            <input type="text" name="codigo_hoja" id="codigoHoja" class="form-control fw-bold bg-light" value="{{ proximo_codigo_hoja }}" readonly>
+                            <small class="text-muted">Correlativo HR-YYYY-XXXX asignado por el sistema.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Fecha y Hora de Salida</label>
+                            <input type="datetime-local" name="fecha_salida" id="fechaSalida" class="form-control" required onchange="onParametrosCambiados()">
+                        </div>
+                    </div>
+
+                    <!-- PASO 2: Origen (Desbloquea cascada) -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-danger">Ciudad Origen</label>
+                            <select name="origen_ciudad" id="origenCiudad" class="form-select" required onchange="onOrigenCambiado()">
+                                <option value="">-- Seleccione Ciudad de Origen --</option>
+                                <option value="La Paz">La Paz</option>
+                                <option value="Cochabamba">Cochabamba</option>
+                                <option value="Santa Cruz">Santa Cruz</option>
+                                <option value="Oruro">Oruro</option>
+                                <option value="Potosí">Potosí</option>
+                                <option value="Sucre">Sucre</option>
+                                <option value="Tarija">Tarija</option>
+                                <option value="Trinidad">Trinidad</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Terminal de Salida</label>
+                            <select name="origen_terminal" id="origenTerminal" class="form-select" required disabled>
+                                <option value="">-- Seleccione Origen primero --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- PASO 3: Selección de Bus disponible en Origen -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label small fw-semibold">Unidad de Flota (Buses en esta ciudad)</label>
+                            <select name="vehiculo_id" id="vehiculoId" class="form-select" required disabled>
+                                <option value="">-- Seleccione Origen primero --</option>
+                                {% for v in vehiculos_disponibles %}
+                                <option value="{{ v.id }}" data-ubicacion="{{ v.ubicacion_actual }}">
+                                    Interno {{ v.numero_interno }} - {{ v.placa }} ({{ v.marca }} {{ v.modelo }} - {{ v.tipo_bus.value|sin_guion }}) - Ubicación: {{ v.ubicacion_actual }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- PASO 4: Destino y Terminal Destino -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-danger">Ciudad Destino</label>
+                            <select name="destino_ciudad" id="destinoCiudad" class="form-select" required disabled onchange="onDestinoCambiado()">
+                                <option value="">-- Seleccione Origen primero --</option>
+                                <option value="La Paz">La Paz</option>
+                                <option value="Cochabamba">Cochabamba</option>
+                                <option value="Santa Cruz">Santa Cruz</option>
+                                <option value="Oruro">Oruro</option>
+                                <option value="Potosí">Potosí</option>
+                                <option value="Sucre">Sucre</option>
+                                <option value="Tarija">Tarija</option>
+                                <option value="Trinidad">Trinidad</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Terminal de Llegada</label>
+                            <select name="destino_terminal" id="destinoTerminal" class="form-select" required disabled>
+                                <option value="">-- Seleccione Destino primero --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- PASO 5: Parámetros Oficiales Calculados Automáticamente -->
+                    <div class="row g-3 mb-3 p-3 bg-light rounded border">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold text-muted">Distancia Oficial ABC</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" id="displayDistancia" class="form-control fw-bold" readonly placeholder="0.0">
+                                <span class="input-group-text">km</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold text-muted">Duración Estimada Oficial</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" id="displayDuracion" class="form-control fw-bold" readonly placeholder="0.0">
+                                <span class="input-group-text">hrs</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold text-muted">Llegada Estimada</label>
+                            <input type="text" id="displayLlegada" class="form-control form-control-sm fw-bold" readonly placeholder="Calculado auto">
+                            <input type="hidden" name="fecha_llegada_estimada" id="fechaLlegadaEstimada">
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- PASO 6: Asignación de Tripulación (Filtrada por Origen) -->
+                    <h6 class="fw-bold text-dark mb-3">Asignación de Tripulación (Choferes en Ciudad Origen)</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-danger">Conductor Principal (Obligatorio)</label>
+                            <select name="conductor_principal_id" id="conductorPrincipalId" class="form-select" required disabled>
+                                <option value="">-- Seleccione Origen primero --</option>
+                                {% for c in conductores %}
+                                <option value="{{ c.id }}" data-ubicacion="{{ c.ubicacion_actual }}">
+                                    {{ c.usuario.nombre }} {{ c.usuario.apellido }} (Lic. {{ c.licencia_conducir }}) - Base: {{ c.ubicacion_actual }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-secondary" id="labelRelevo">Conductor de Relevo (&gt; 4.0 hrs)</label>
+                            <select name="conductor_relevo_id" id="conductorRelevoId" class="form-select" disabled>
+                                <option value="">-- Bloqueado si duración &le; 4.0 hrs --</option>
+                                {% for c in conductores %}
+                                <option value="{{ c.id }}" data-ubicacion="{{ c.ubicacion_actual }}">
+                                    {{ c.usuario.nombre }} {{ c.usuario.apellido }} (Lic. {{ c.licencia_conducir }}) - Base: {{ c.ubicacion_actual }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-tc-primary" id="btnSubmitHoja" disabled>Programar Despacho</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Catálogo Canónico de Terminales de Bolivia
+const TERMINALES_OFICIALES = {
+    "La Paz": ["Terminal de Buses La Paz", "Terminal Minasa"],
+    "Cochabamba": ["Terminal de Buses Cochabamba"],
+    "Santa Cruz": ["Terminal Bimodal Santa Cruz"],
+    "Oruro": ["Terminal de Buses Oruro (Hernando Siles)", "Nueva Terminal de Buses Oruro"],
+    "Sucre": ["Terminal Interdepartamental Sucre"],
+    "Potosí": ["Terminal de Buses Potosí"],
+    "Tarija": ["Terminal de Buses Tarija (Torrecillas)"],
+    "Trinidad": ["Terminal de Buses Trinidad"]
+};
+
+// Matriz de Rutas Oficiales ABC / ATT (distancia km, duracion hrs)
+const RUTAS_OFICIALES = {
+    "Cochabamba|La Paz": { km: 380.0, hrs: 7.5 },
+    "Cochabamba|Santa Cruz": { km: 480.0, hrs: 9.5 },
+    "La Paz|Santa Cruz": { km: 860.0, hrs: 17.0 },
+    "La Paz|Oruro": { km: 225.0, hrs: 3.5 },
+    "Cochabamba|Oruro": { km: 215.0, hrs: 4.0 },
+    "Cochabamba|Sucre": { km: 360.0, hrs: 8.0 },
+    "Potosí|Sucre": { km: 160.0, hrs: 3.0 },
+    "Oruro|Potosí": { km: 310.0, hrs: 5.0 },
+    "La Paz|Potosí": { km: 535.0, hrs: 9.0 },
+    "Santa Cruz|Sucre": { km: 500.0, hrs: 11.0 },
+    "Santa Cruz|Trinidad": { km: 550.0, hrs: 9.0 },
+    "Potosí|Tarija": { km: 345.0, hrs: 7.0 },
+    "Cochabamba|Tarija": { km: 690.0, hrs: 13.0 },
+    "La Paz|Tarija": { km: 910.0, hrs: 15.0 }
+};
+
+// Guardar opciones originales de buses y conductores para filtrar limpiamente
+let opcionesBusesOriginales = [];
+let opcionesConductoresOriginales = [];
+
+document.addEventListener("DOMContentLoaded", function() {
+    const busSelect = document.getElementById('vehiculoId');
+    const condPrincipalSelect = document.getElementById('conductorPrincipalId');
+    
+    // Cachear opciones completas
+    Array.from(busSelect.options).forEach(opt => {
+        if (opt.value) opcionesBusesOriginales.push({ val: opt.value, text: opt.text, ubi: opt.getAttribute('data-ubicacion') });
+    });
+    Array.from(condPrincipalSelect.options).forEach(opt => {
+        if (opt.value) opcionesConductoresOriginales.push({ val: opt.value, text: opt.text, ubi: opt.getAttribute('data-ubicacion') });
+    });
+});
+
+function onOrigenCambiado() {
+    const origen = document.getElementById('origenCiudad').value;
+    const origenTerminal = document.getElementById('origenTerminal');
+    const vehiculoSelect = document.getElementById('vehiculoId');
+    const destinoSelect = document.getElementById('destinoCiudad');
+    const condPrincipalSelect = document.getElementById('conductorPrincipalId');
+    const condRelevoSelect = document.getElementById('conductorRelevoId');
+
+    if (!origen) {
+        // Bloquear todo
+        origenTerminal.disabled = true;
+        vehiculoSelect.disabled = true;
+        destinoSelect.disabled = true;
+        document.getElementById('destinoTerminal').disabled = true;
+        condPrincipalSelect.disabled = true;
+        condRelevoSelect.disabled = true;
+        document.getElementById('btnSubmitHoja').disabled = true;
+        return;
+    }
+
+    // 1. Poblar Terminales de Origen
+    origenTerminal.innerHTML = "";
+    const terminales = TERMINALES_OFICIALES[origen] || [`Terminal de Buses ${origen}`];
+    terminales.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        origenTerminal.appendChild(opt);
+    });
+    origenTerminal.disabled = false;
+
+    // 2. Filtrar Buses en esta ciudad
+    vehiculoSelect.innerHTML = '<option value="">-- Seleccionar Bus Disponible en ' + origen + ' --</option>';
+    const busesFiltrados = opcionesBusesOriginales.filter(b => b.ubi && b.ubi.trim().toLowerCase() === origen.trim().toLowerCase());
+    if (busesFiltrados.length === 0) {
+        vehiculoSelect.innerHTML = '<option value="">-- Sin buses disponibles en ' + origen + ' --</option>';
+    } else {
+        busesFiltrados.forEach(b => {
+            const opt = document.createElement("option");
+            opt.value = b.val;
+            opt.textContent = b.text;
+            vehiculoSelect.appendChild(opt);
+        });
+    }
+    vehiculoSelect.disabled = false;
+
+    // 3. Filtrar Conductores en esta ciudad
+    condPrincipalSelect.innerHTML = '<option value="">-- Seleccionar Conductor en ' + origen + ' --</option>';
+    condRelevoSelect.innerHTML = '<option value="">-- Seleccionar Relevo en ' + origen + ' --</option>';
+    const condFiltrados = opcionesConductoresOriginales.filter(c => c.ubi && c.ubi.trim().toLowerCase() === origen.trim().toLowerCase());
+    
+    if (condFiltrados.length === 0) {
+        condPrincipalSelect.innerHTML = '<option value="">-- Sin conductores en ' + origen + ' --</option>';
+    } else {
+        condFiltrados.forEach(c => {
+            const opt1 = document.createElement("option");
+            opt1.value = c.val;
+            opt1.textContent = c.text;
+            condPrincipalSelect.appendChild(opt1);
+
+            const opt2 = document.createElement("option");
+            opt2.value = c.val;
+            opt2.textContent = c.text;
+            condRelevoSelect.appendChild(opt2);
+        });
+    }
+    condPrincipalSelect.disabled = false;
+
+    // 4. Habilitar Destino
+    destinoSelect.disabled = false;
+    Array.from(destinoSelect.options).forEach(opt => {
+        opt.disabled = (opt.value === origen);
+    });
+
+    onParametrosCambiados();
+}
+
+function onDestinoCambiado() {
+    const destino = document.getElementById('destinoCiudad').value;
+    const destinoTerminal = document.getElementById('destinoTerminal');
+
+    if (!destino) {
+        destinoTerminal.disabled = true;
+        return;
+    }
+
+    destinoTerminal.innerHTML = "";
+    const terminales = TERMINALES_OFICIALES[destino] || [`Terminal de Buses ${destino}`];
+    terminales.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        destinoTerminal.appendChild(opt);
+    });
+    destinoTerminal.disabled = false;
+
+    onParametrosCambiados();
+}
+
+function onParametrosCambiados() {
+    const origen = document.getElementById('origenCiudad').value;
+    const destino = document.getElementById('destinoCiudad').value;
+    const fechaSalidaVal = document.getElementById('fechaSalida').value;
+    const condRelevoSelect = document.getElementById('conductorRelevoId');
+    const labelRelevo = document.getElementById('labelRelevo');
+    const btnSubmit = document.getElementById('btnSubmitHoja');
+
+    if (!origen || !destino || origen === destino) {
+        document.getElementById('displayDistancia').value = "";
+        document.getElementById('displayDuracion').value = "";
+        document.getElementById('displayLlegada').value = "";
+        document.getElementById('fechaLlegadaEstimada').value = "";
+        btnSubmit.disabled = true;
+        return;
+    }
+
+    // Calcular Ruta Oficial
+    const key1 = `${origen}|${destino}`;
+    const key2 = `${destino}|${origen}`;
+    const ruta = RUTAS_OFICIALES[key1] || RUTAS_OFICIALES[key2] || { km: 400.0, hrs: 8.0 };
+
+    document.getElementById('displayDistancia').value = ruta.km;
+    document.getElementById('displayDuracion').value = ruta.hrs;
+
+    // Calcular Fecha de Llegada Estimada
+    if (fechaSalidaVal) {
+        const dSalida = new Date(fechaSalidaVal);
+        const dLlegada = new Date(dSalida.getTime() + ruta.hrs * 60 * 60 * 1000);
+        
+        // Formato para display local
+        const pad = (n) => String(n).padStart(2, '0');
+        const strDisplay = `${dLlegada.getFullYear()}-${pad(dLlegada.getMonth()+1)}-${pad(dLlegada.getDate())} ${pad(dLlegada.getHours())}:${pad(dLlegada.getMinutes())}`;
+        document.getElementById('displayLlegada').value = strDisplay;
+        
+        // Formato ISO para el backend
+        const strISO = `${dLlegada.getFullYear()}-${pad(dLlegada.getMonth()+1)}-${pad(dLlegada.getDate())}T${pad(dLlegada.getHours())}:${pad(dLlegada.getMinutes())}`;
+        document.getElementById('fechaLlegadaEstimada').value = strISO;
+    }
+
+    // Regla ATT: Si duración > 4.0 hrs -> Habilitar Conductor de Relevo
+    if (ruta.hrs > 4.0) {
+        condRelevoSelect.disabled = false;
+        condRelevoSelect.required = true;
+        labelRelevo.classList.add('text-danger');
+        labelRelevo.classList.remove('text-secondary');
+        labelRelevo.innerHTML = "Conductor de Relevo (Obligatorio &gt; 4.0 hrs)";
+    } else {
+        condRelevoSelect.disabled = true;
+        condRelevoSelect.required = false;
+        condRelevoSelect.value = "";
+        labelRelevo.classList.remove('text-danger');
+        labelRelevo.classList.add('text-secondary');
+        labelRelevo.innerHTML = "Conductor de Relevo (No requerido para trayecto &le; 4.0 hrs)";
+    }
+
+    btnSubmit.disabled = false;
+}
+
+function filtrarTablaHojas() {
+    const texto = (document.getElementById('filtroBuscarHojas').value || '').trim().toLowerCase();
+    const estado = document.getElementById('filtroEstadoHoja').value;
+    const origen = document.getElementById('filtroOrigenHoja').value;
+    const destino = document.getElementById('filtroDestinoHoja').value;
+    const filas = document.querySelectorAll('.fila-hoja');
+    let visibles = 0;
+
+    filas.forEach(f => {
+        const searchVal = f.getAttribute('data-search') || '';
+        const estadoVal = f.getAttribute('data-estado') || '';
+        const origenVal = f.getAttribute('data-origen') || '';
+        const destinoVal = f.getAttribute('data-destino') || '';
+
+        const cumpleTexto = !texto || searchVal.includes(texto);
+        const cumpleEstado = !estado || estadoVal === estado;
+        const cumpleOrigen = !origen || origenVal === origen;
+        const cumpleDestino = !destino || destinoVal === destino;
+
+        if (cumpleTexto && cumpleEstado && cumpleOrigen && cumpleDestino) {
+            f.style.display = '';
+            visibles++;
+        } else {
+            f.style.display = 'none';
+        }
+    });
+
+    const contador = document.getElementById('contadorHojas');
+    if (contador) {
+        contador.textContent = `${visibles} de ${filas.length}`;
+    }
+}
+</script>
+{% endif %}
+{% endblock %}

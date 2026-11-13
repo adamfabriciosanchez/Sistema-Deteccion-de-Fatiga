@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Trans Copacabana{% endblock %}</title>
+    <!-- Bootstrap 5 CSS (Estructura adoptada del docente) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Estilos Corporativos Trans Copacabana (Rojo y Blanco) -->
+    <link rel="stylesheet" href="/static/css/trans_copacabana.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Barra de Navegación Institucional -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-copacabana">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fa-solid fa-bus me-2"></i>
+                <span>TRANS COPACABANA</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarMain">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Inicio</a>
+                    </li>
+                    {% if current_user %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">Dashboard</a>
+                    </li>
+                    {% if current_user.rol.value == 'ADMIN' %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="adminDrop" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Administración
+                        </a>
+                        <ul class="dropdown-menu shadow-sm" aria-labelledby="adminDrop">
+                            <li><a class="dropdown-item" href="/usuarios">Gestión de Usuarios y Choferes</a></li>
+                            <li><a class="dropdown-item" href="/flota">Flota de Vehículos</a></li>
+                            <li><a class="dropdown-item" href="/camaras">Gestión de Cámaras</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/hojas-ruta">Hojas de Ruta y Programación</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/pre-despacho">Pre-Despacho</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/monitoreo">Centro de Monitoreo</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/centro-camaras">Centro de Cámaras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/reportes">Reportes</a>
+                    </li>
+                    {% elif current_user.rol.value == 'OPERADOR' %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/hojas-ruta">Hojas de Ruta</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/monitoreo">Centro de Monitoreo</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/centro-camaras">Centro de Cámaras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/reportes">Reportes</a>
+                    </li>
+                    {% elif current_user.rol.value == 'CONDUCTOR' %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/mi-hoja">Mi Hoja de Ruta</a>
+                    </li>
+                    {% endif %}
+                    {% endif %}
+                </ul>
+
+                <!-- Panel de Usuario y Sesión -->
+                <ul class="navbar-nav ms-auto align-items-center">
+                    {% if current_user %}
+                    <li class="nav-item me-3 text-white">
+                        <span class="fw-semibold">{{ current_user.nombre }} {{ current_user.apellido }}</span>
+                        <span class="badge badge-role ms-2">{{ current_user.rol.value|sin_guion }}</span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-sm btn-outline-light" href="/logout">
+                            <i class="fa-solid fa-right-from-bracket me-1"></i> Cerrar Sesión
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="btn btn-sm btn-light fw-bold text-danger px-3" href="/login">
+                            <i class="fa-solid fa-lock me-1"></i> Iniciar Sesión
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenedor Principal de Mensajes y Contenido -->
+    <main class="container my-4 flex-grow-1">
+        {% if error_msg %}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fa-solid fa-circle-exclamation me-2"></i>
+            {{ error_msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        {% if success_msg %}
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fa-solid fa-circle-check me-2"></i>
+            {{ success_msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Pie de Página Institucional -->
+    <footer class="footer-copacabana">
+        <div class="container text-center">
+            <p class="mb-0 text-muted">
+                Trans Copacabana &copy; 2026 | Sistema de Administración, Control y Monitoreo de Flota
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 Bundle con Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

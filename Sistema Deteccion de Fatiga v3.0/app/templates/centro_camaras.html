@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Centro de Cámaras - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+    <div>
+        <h2 class="h3 fw-bold mb-0 text-dark">Centro de Cámaras en Vivo</h2>
+        <p class="text-muted small mb-0">Monitoreo visual continuo de cabinas y telemetría de fatiga en tiempo real</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span id="camWsStatus" class="badge bg-secondary">
+            Conectando...
+        </span>
+        <a href="/monitoreo" class="btn btn-sm btn-outline-danger">
+            Ir a Monitoreo en Mapa
+        </a>
+    </div>
+</div>
+
+<!-- Grid de Cámaras de la Flota -->
+<div class="row g-3" id="gridCamaras">
+    {% for b in flota %}
+    <div class="col-xl-4 col-md-6 camara-card-wrapper" id="card-wrap-{{ b.hoja_de_ruta_id }}">
+        <div class="card card-formal h-100 shadow-sm border border-secondary border-opacity-25">
+            <!-- Encabezado de la Tarjeta del Bus -->
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
+                <div>
+                    <span class="fw-bold">Bus Interno {{ b.bus_numero_interno }}</span>
+                    <span class="text-white-50 small ms-1">({{ b.bus_placa }})</span>
+                </div>
+                <span id="camBadgeRiesgo-{{ b.hoja_de_ruta_id }}"
+                      class="badge {% if b.nivel_riesgo == 'ROJO' %}bg-danger{% elif b.nivel_riesgo == 'AMARILLO' %}bg-warning text-dark{% elif b.nivel_riesgo == 'VERDE' %}bg-success{% else %}bg-secondary{% endif %}">
+                    {% if b.nivel_riesgo == 'ROJO' %}CRÍTICO{% elif b.nivel_riesgo == 'AMARILLO' %}ADVERTENCIA{% elif b.nivel_riesgo == 'VERDE' %}ÓPTIMO{% else %}EN ESPERA{% endif %}
+                </span>
+            </div>
+
+            <!-- Visor de Video / Transmisión en Vivo -->
+            <div class="position-relative bg-black text-center overflow-hidden" style="height: 240px;">
+                <img id="camFeed-{{ b.hoja_de_ruta_id }}"
+                     src=""
+                     alt="Transmisión Cabina"
+                     class="w-100 h-100 object-fit-cover d-none" />
+                
+                <div id="camPlaceholder-{{ b.hoja_de_ruta_id }}"
+                     class="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white-50 p-3">
+                    <i class="fa-solid fa-video-slash fa-2x mb-2 text-secondary"></i>
+                    <div class="small fw-semibold">Esperando inicio de cámara en cabina...</div>
+                    <div class="text-muted" style="font-size: 0.75rem;">El conductor activará la detección desde su smartphone</div>
+                </div>
+
+                <!-- Overlay de métricas rápidas sobre video -->
+                <div class="position-absolute bottom-0 start-0 w-100 p-2 bg-dark bg-opacity-75 d-flex justify-content-between align-items-center text-white small">
+                    <div>
+                        Velocidad: <strong id="camVel-{{ b.hoja_de_ruta_id }}">{{ "%.1f"|format(b.velocidad_kmh|float) }}</strong> km/h
+                    </div>
+                    <div>
+                        IF: <strong id="camIf-{{ b.hoja_de_ruta_id }}" class="text-warning">{{ "%.2f"|format(b.indice_fatiga|float) if b.indice_fatiga is not none else '0.00' }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cuerpo de Datos de la Unidad y Conductor -->
+            <div class="card-body p-3">
+                <!-- Información de Conducción y Tripulación -->
+                <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom">
+                    {% if b.foto_conductor %}
+                    <img src="{{ b.foto_conductor }}" alt="{{ b.conductor }}" class="rounded-circle shadow-sm" style="width: 44px; height: 44px; object-fit: cover;">
+                    {% else %}
+                    <div class="bg-light text-secondary rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 44px; height: 44px; border: 1px solid #ddd;">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    {% endif %}
+                    <div class="flex-grow-1 overflow-hidden">
+                        <div class="fw-bold text-dark text-truncate">{{ b.conductor or 'Conductor Asignado' }}</div>
+                        <div class="text-muted small text-truncate">Lic: {{ b.licencia_conductor or 'Profesional' }}</div>
+                    </div>
+                    {% if b.foto_bus %}
+                    <img src="{{ b.foto_bus }}" alt="Bus" class="rounded border" style="width: 52px; height: 40px; object-fit: cover;">
+                    {% else %}
+                    <div class="bg-light text-secondary rounded d-flex align-items-center justify-content-center" style="width: 52px; height: 40px; border: 1px solid #ddd;">
+                        <i class="fa-solid fa-bus text-muted"></i>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Ruta Activa -->
+                <div class="small mb-2">
+                    <span class="text-muted">Ruta:</span> <strong>{{ b.ruta }}</strong>
+                    <div class="text-muted" style="font-size: 0.75rem;">Hoja de Ruta: {{ b.codigo_hoja }}</div>
+                </div>
+
+                <!-- Métricas Biométricas Detalladas para Operador -->
+                <div class="bg-light p-2 rounded small mb-2 border">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Apertura Ojos (EAR):</span>
+                        <strong id="camEar-{{ b.hoja_de_ruta_id }}">{{ "%.3f"|format(b.ear|float) if b.ear is not none else '--' }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Apertura Bucal (MAR):</span>
+                        <strong id="camMar-{{ b.hoja_de_ruta_id }}">{{ "%.3f"|format(b.mar|float) if b.mar is not none else '--' }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">PERCLOS (% Cierre 60s):</span>
+                        <strong id="camPerclos-{{ b.hoja_de_ruta_id }}">{{ "%.1f"|format(b.perclos|float) if b.perclos is not none else '0.0' }}%</strong>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-2">
+                    <a href="/monitoreo?hoja_id={{ b.hoja_de_ruta_id }}" class="btn btn-sm btn-outline-danger flex-grow-1">
+                        Ver en Mapa
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="card card-formal p-5 text-center text-muted">
+            <i class="fa-solid fa-video-slash fa-3x mb-3 text-secondary opacity-50"></i>
+            <h5 class="fw-bold text-dark">No hay unidades en tránsito en este momento</h5>
+            <p class="small text-muted mb-0">Cuando un conductor inicie viaje e ingrese a la cabina con detección de fatiga, su cámara en vivo aparecerá aquí automáticamente.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Script de Conexión en Tiempo Real para el Centro de Cámaras -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const statusBadge = document.getElementById("camWsStatus");
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws/dashboard`;
+    let socket = null;
+
+    function conectarWebSocket() {
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+            if (statusBadge) {
+                statusBadge.className = "badge bg-success";
+                statusBadge.textContent = "EN VIVO";
+            }
+        };
+
+        socket.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.tipo_evento === "TELEMETRIA_ACTUALIZADA") {
+                    actualizarCamaraCard(msg.data);
+                } else if (msg.tipo_evento === "SNAPSHOT_INICIAL") {
+                    if (Array.isArray(msg.buses)) {
+                        msg.buses.forEach(b => actualizarCamaraCard(b));
+                    }
+                }
+            } catch (e) {
+                console.error("[CentroCamaras] Error al parsear websocket:", e);
+            }
+        };
+
+        socket.onclose = () => {
+            if (statusBadge) {
+                statusBadge.className = "badge bg-danger";
+                statusBadge.textContent = "DESCONECTADO";
+            }
+            setTimeout(conectarWebSocket, 3000);
+        };
+    }
+
+    function actualizarCamaraCard(data) {
+        if (!data || !data.hoja_de_ruta_id) return;
+        const hid = data.hoja_de_ruta_id;
+
+        // Actualizar imagen si viene frame_b64
+        const imgEl = document.getElementById(`camFeed-${hid}`);
+        const phEl = document.getElementById(`camPlaceholder-${hid}`);
+        if (data.frame_b64 && imgEl) {
+            imgEl.src = data.frame_b64;
+            imgEl.classList.remove("d-none");
+            if (phEl) phEl.classList.add("d-none");
+        }
+
+        // Actualizar velocidad
+        const velEl = document.getElementById(`camVel-${hid}`);
+        if (velEl && data.velocidad_kmh !== undefined) {
+            velEl.textContent = parseFloat(data.velocidad_kmh).toFixed(1);
+        }
+
+        // Actualizar IF
+        const ifEl = document.getElementById(`camIf-${hid}`);
+        if (ifEl && data.indice_fatiga !== undefined && data.indice_fatiga !== null) {
+            const ifVal = parseFloat(data.indice_fatiga);
+            ifEl.textContent = ifVal.toFixed(2);
+            ifEl.className = ifVal >= 0.75 ? "text-danger fw-bold" : (ifVal >= 0.50 ? "text-warning fw-bold" : "text-success");
+        }
+
+        // Actualizar EAR, MAR, PERCLOS
+        const earEl = document.getElementById(`camEar-${hid}`);
+        if (earEl && data.ear !== undefined && data.ear !== null) earEl.textContent = parseFloat(data.ear).toFixed(3);
+        const marEl = document.getElementById(`camMar-${hid}`);
+        if (marEl && data.mar !== undefined && data.mar !== null) marEl.textContent = parseFloat(data.mar).toFixed(3);
+        const perclosEl = document.getElementById(`camPerclos-${hid}`);
+        if (perclosEl && data.perclos !== undefined && data.perclos !== null) perclosEl.textContent = parseFloat(data.perclos).toFixed(1) + "%";
+
+        // Actualizar Badge de Riesgo
+        const badgeRiesgo = document.getElementById(`camBadgeRiesgo-${hid}`);
+        if (badgeRiesgo && data.nivel_riesgo) {
+            if (data.nivel_riesgo === "ROJO") {
+                badgeRiesgo.className = "badge bg-danger";
+                badgeRiesgo.textContent = "CRÍTICO";
+            } else if (data.nivel_riesgo === "AMARILLO") {
+                badgeRiesgo.className = "badge bg-warning text-dark";
+                badgeRiesgo.textContent = "ADVERTENCIA";
+            } else {
+                badgeRiesgo.className = "badge bg-success";
+                badgeRiesgo.textContent = "ÓPTIMO";
+            }
+        }
+    }
+
+    conectarWebSocket();
+});
+</script>
+{% endblock %}
+

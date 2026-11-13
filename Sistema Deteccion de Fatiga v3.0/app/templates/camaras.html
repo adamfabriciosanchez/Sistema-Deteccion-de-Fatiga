@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Cámaras - Trans Copacabana{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+        <h2 class="h3 fw-bold mb-0 text-dark">Gestión de Cámaras de Seguridad</h2>
+        <p class="text-muted small mb-0">Asignación de dispositivos de visión artificial a la flota (código generado automáticamente según el bus)</p>
+    </div>
+    <div>
+        <button type="button" class="btn btn-tc-primary" data-bs-toggle="modal" data-bs-target="#modalNuevaCamara">
+            <i class="fa-solid fa-plus me-1"></i> Registrar Cámara
+        </button>
+    </div>
+</div>
+
+<!-- Barra de Filtros y Búsqueda -->
+<div class="card card-formal mb-3">
+    <div class="card-body p-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                    <input type="text" id="filtroBuscarCamaras" class="form-control" placeholder="Buscar por código, bus, placa, modelo..." onkeyup="filtrarTablaCamaras()">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select id="filtroEstadoCamara" class="form-select" onchange="filtrarTablaCamaras()">
+                    <option value="">Todos los Estados</option>
+                    <option value="ACTIVA">Activa</option>
+                    <option value="MANTENIMIENTO">Mantenimiento</option>
+                    <option value="BAJA">Dada de Baja</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select id="filtroTipoCamara" class="form-select" onchange="filtrarTablaCamaras()">
+                    <option value="">Todos los Tipos</option>
+                    <option value="CELULAR_CONDUCTOR">Celular Conductor</option>
+                    <option value="CAMARA_INFRARROJA_USB">Infrarroja USB</option>
+                    <option value="WEBCAM_CABINA">Webcam Cabina</option>
+                </select>
+            </div>
+            <div class="col-md-2 text-md-end">
+                <span id="contadorCamaras" class="badge bg-light text-dark border p-2 w-100 text-center">
+                    {{ camaras|length }} cámaras
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-formal">
+    <div class="card-formal-header">
+        Cámaras Asignadas a la Flota
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-formal align-middle mb-0" id="tablaCamaras">
+            <thead>
+                <tr>
+                    <th>Código Cámara</th>
+                    <th>Bus Asignado</th>
+                    <th>Tipo de Dispositivo</th>
+                    <th>Resolución</th>
+                    <th>Estado</th>
+                    <th>Fecha Registro</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cam in camaras %}
+                <tr class="fila-camara"
+                    data-search="{{ cam.codigo_camara|lower }} {% if cam.vehiculo %}{{ cam.vehiculo.numero_interno|lower }} {{ cam.vehiculo.placa|lower }} {{ cam.vehiculo.marca|lower }} {{ cam.vehiculo.modelo|lower }}{% endif %} {{ (cam.marca_modelo or '')|lower }}"
+                    data-estado="{{ cam.estado }}"
+                    data-tipo="{{ cam.tipo_dispositivo }}">
+                    <td class="fw-bold text-danger">{{ cam.codigo_camara }}</td>
+                    <td>
+                        {% if cam.vehiculo %}
+                        <div class="fw-semibold">Bus Interno {{ cam.vehiculo.numero_interno }}</div>
+                        <div class="text-muted small">Placa: {{ cam.vehiculo.placa }} ({{ cam.vehiculo.marca }} {{ cam.vehiculo.modelo }})</div>
+                        {% else %}
+                        <span class="text-muted fst-italic">Sin bus asignado</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="small fw-semibold">{{ cam.marca_modelo or 'Cámara Celular Cabina' }}</div>
+                        <span class="badge bg-light text-dark border">{{ cam.tipo_dispositivo }}</span>
+                    </td>
+                    <td class="small">{{ cam.resolucion }}</td>
+                    <td>
+                        {% if cam.estado == 'ACTIVA' %}
+                        <span class="badge bg-success">Activa</span>
+                        {% elif cam.estado == 'MANTENIMIENTO' %}
+                        <span class="badge bg-warning text-dark">Mantenimiento</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ cam.estado }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="small text-muted">
+                        {{ cam.fecha_registro.strftime('%d/%m/%Y %H:%M') if cam.fecha_registro else '--' }}
+                    </td>
+                    <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-1"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalEditar{{ cam.id }}">
+                            Editar
+                        </button>
+                        <form action="/camaras/{{ cam.id }}/eliminar" method="POST" class="d-inline"
+                              onsubmit="return confirm('¿Confirmas eliminar el registro de esta cámara?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                Eliminar
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+
+                <!-- Modal Editar Cámara -->
+                <div class="modal fade" id="modalEditar{{ cam.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title fw-bold">Editar Cámara {{ cam.codigo_camara }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form action="/camaras/{{ cam.id }}/editar" method="POST">
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Código de Cámara</label>
+                                        <input type="text" class="form-control bg-light fw-bold text-danger" value="{{ cam.codigo_camara }}" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Bus Asignado</label>
+                                        <select name="vehiculo_id" class="form-select" required>
+                                            {% if cam.vehiculo %}
+                                            <option value="{{ cam.vehiculo.id }}" selected>
+                                                Bus Interno {{ cam.vehiculo.numero_interno }} ({{ cam.vehiculo.placa }})
+                                            </option>
+                                            {% endif %}
+                                            {% for v in vehiculos_disponibles %}
+                                            {% if not cam.vehiculo or v.id != cam.vehiculo.id %}
+                                            <option value="{{ v.id }}">Bus Interno {{ v.numero_interno }} ({{ v.placa }})</option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Marca / Modelo del Dispositivo</label>
+                                        <input type="text" name="marca_modelo" class="form-control" value="{{ cam.marca_modelo }}">
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <label class="form-label small fw-semibold">Tipo</label>
+                                            <select name="tipo_dispositivo" class="form-select">
+                                                <option value="CELULAR_CONDUCTOR" {% if cam.tipo_dispositivo == 'CELULAR_CONDUCTOR' %}selected{% endif %}>Celular Conductor</option>
+                                                <option value="CAMARA_INFRARROJA_USB" {% if cam.tipo_dispositivo == 'CAMARA_INFRARROJA_USB' %}selected{% endif %}>Cámara Infrarroja USB</option>
+                                                <option value="WEBCAM_CABINA" {% if cam.tipo_dispositivo == 'WEBCAM_CABINA' %}selected{% endif %}>WebCam Cabina</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label small fw-semibold">Estado</label>
+                                            <select name="estado" class="form-select">
+                                                <option value="ACTIVA" {% if cam.estado == 'ACTIVA' %}selected{% endif %}>Activa</option>
+                                                <option value="MANTENIMIENTO" {% if cam.estado == 'MANTENIMIENTO' %}selected{% endif %}>Mantenimiento</option>
+                                                <option value="BAJA" {% if cam.estado == 'BAJA' %}selected{% endif %}>Dada de Baja</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-tc-primary">Guardar Cambios</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <tr id="filaSinCamaras">
+                    <td colspan="7" class="text-center text-muted py-4">No hay cámaras registradas en el sistema.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Registrar Nueva Cámara -->
+<div class="modal fade" id="modalNuevaCamara" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Registrar Nueva Cámara de Cabina</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/camaras/nuevo" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Código de Cámara Generado</label>
+                        <input type="text" id="previewCodigoCamara" class="form-control bg-light fw-bold text-danger" value="CAM-[Seleccione Bus]" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Bus Disponible a Asignar <span class="text-danger">*</span></label>
+                        <select name="vehiculo_id" id="selectBusCamara" class="form-select" required onchange="actualizarPreviewCodigoCamara()">
+                            <option value="" data-interno="">-- Seleccionar Bus Disponible --</option>
+                            {% for v in vehiculos_disponibles %}
+                            <option value="{{ v.id }}" data-interno="{{ v.numero_interno }}">Bus Interno {{ v.numero_interno }} ({{ v.placa }} - {{ v.modelo }})</option>
+                            {% endfor %}
+                        </select>
+                        {% if not vehiculos_disponibles %}
+                        <div class="text-danger small mt-1">Todos los buses registrados ya cuentan con una cámara asignada.</div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Marca / Modelo de Dispositivo</label>
+                        <input type="text" name="marca_modelo" class="form-control" placeholder="Ej. Smartphone Redmi Note 12">
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold">Tipo de Dispositivo</label>
+                            <select name="tipo_dispositivo" class="form-select">
+                                <option value="CELULAR_CONDUCTOR" selected>Celular Conductor</option>
+                                <option value="CAMARA_INFRARROJA_USB">Cámara Infrarroja USB</option>
+                                <option value="WEBCAM_CABINA">WebCam Cabina</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold">Resolución</label>
+                            <select name="resolucion" class="form-select">
+                                <option value="640x480" selected>640 x 480 (VGA)</option>
+                                <option value="1280x720">1280 x 720 (HD)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-tc-primary" {% if not vehiculos_disponibles %}disabled{% endif %}>
+                        Registrar Cámara
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function actualizarPreviewCodigoCamara() {
+    const sel = document.getElementById('selectBusCamara');
+    const opt = sel.options[sel.selectedIndex];
+    const interno = opt.getAttribute('data-interno');
+    document.getElementById('previewCodigoCamara').value = interno ? `CAM-${interno}` : 'CAM-[Seleccione Bus]';
+}
+
+function filtrarTablaCamaras() {
+    const texto = (document.getElementById('filtroBuscarCamaras').value || '').trim().toLowerCase();
+    const estado = document.getElementById('filtroEstadoCamara').value;
+    const tipo = document.getElementById('filtroTipoCamara').value;
+    const filas = document.querySelectorAll('.fila-camara');
+    let visibles = 0;
+
+    filas.forEach(f => {
+        const searchVal = f.getAttribute('data-search') || '';
+        const estadoVal = f.getAttribute('data-estado') || '';
+        const tipoVal = f.getAttribute('data-tipo') || '';
+
+        const cumpleTexto = !texto || searchVal.includes(texto);
+        const cumpleEstado = !estado || estadoVal === estado;
+        const cumpleTipo = !tipo || tipoVal === tipo;
+
+        if (cumpleTexto && cumpleEstado && cumpleTipo) {
+            f.style.display = '';
+            visibles++;
+        } else {
+            f.style.display = 'none';
+        }
+    });
+
+    const contador = document.getElementById('contadorCamaras');
+    if (contador) {
+        contador.textContent = `${visibles} de ${filas.length} cámaras`;
+    }
+}
+</script>
+{% endblock %}
